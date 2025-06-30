@@ -1,0 +1,213 @@
+<script>
+// Global variables
+let dashboardData = null;
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+  initializeDashboard();
+  loadData();
+});
+
+/**
+ * Initialize dashboard elements
+ */
+function initializeDashboard() {
+  // Set current date
+  const now = new Date();
+  const currentDateElement = document.getElementById('currentDate');
+  if (currentDateElement) {
+    currentDateElement.textContent = formatDate(now);
+  }
+  
+  // Refresh button
+  const refreshBtn = document.getElementById('refreshBtn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', refreshData);
+  }
+}
+
+/**
+ * Load data from backend
+ */
+function loadData() {
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(onDataLoaded)
+    .withFailureHandler(onDataError)
+    .getScheduleData();
+}
+
+/**
+ * Refresh data
+ */
+function refreshData() {
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(onDataLoaded)
+    .withFailureHandler(onDataError)
+    .refreshCache();
+}
+
+/**
+ * Handle successful data load
+ */
+function onDataLoaded(data) {
+  hideLoading();
+  
+  if (!data.success) {
+    showError(data.error || 'Có lỗi xảy ra khi tải dữ liệu');
+    return;
+  }
+  
+  dashboardData = data;
+  renderDashboard(data);
+  showDashboard();
+}
+
+/**
+ * Handle data load error
+ */
+function onDataError(error) {
+  hideLoading();
+  showError('Không thể tải dữ liệu. Vui lòng thử lại.');
+  console.error('Error loading data:', error);
+}
+
+/**
+ * Render dashboard with data
+ */
+function renderDashboard(data) {
+  renderSummary(data.summary);
+  renderTimeline(data.timeline);
+}
+
+/**
+ * Render summary section
+ */
+function renderSummary(summary) {
+  document.getElementById('totalCompanies').textContent = summary.totalCompanies;
+  document.getElementById('currentMonth').textContent = `${summary.currentMonth}/${summary.currentYear}`;
+  document.getElementById('maxPeoplePerDay').textContent = summary.maxPeoplePerDay;
+}
+
+/**
+ * Render timeline table
+ */
+function renderTimeline(timeline) {
+  const table = document.getElementById('timelineTable');
+  const header = document.getElementById('timelineHeader');
+  const body = document.getElementById('timelineBody');
+  
+  // Clear existing content
+  header.innerHTML = '<th class="company-column">Công ty</th>';
+  body.innerHTML = '';
+  
+  if (!timeline.dates || timeline.dates.length === 0) {
+    body.innerHTML = '<tr><td colspan="100%">Không có dữ liệu</td></tr>';
+    return;
+  }
+  
+  // Create header with dates
+  timeline.dates.forEach(date => {
+    const th = document.createElement('th');
+    th.textContent = date;
+    
+    // Mark weekends
+    const fullDate = new Date(dashboardData.summary.currentYear, dashboardData.summary.currentMonth - 1, date);
+    const dayOfWeek = fullDate.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      th.classList.add('weekend');
+    }
+    
+    header.appendChild(th);
+  });
+  
+  // Create data rows
+  timeline.rows.forEach((row, index) => {
+    const tr = document.createElement('tr');
+    
+    // Add total row class
+    if (row.company === 'TỔNG') {
+      tr.classList.add('total-row');
+    }
+    
+    // Company name cell
+    const companyCell = document.createElement('td');
+    companyCell.classList.add('company-cell');
+    companyCell.textContent = row.company;
+    tr.appendChild(companyCell);
+    
+    // Data cells
+    row.data.forEach((value, dayIndex) => {
+      const td = document.createElement('td');
+      td.classList.add('data-cell');
+      
+      if (value > 0) {
+        td.textContent = value;
+        td.classList.add('has-data');
+      } else {
+        td.textContent = '—';
+        td.classList.add('empty');
+      }
+      
+      // Mark weekends
+      const fullDate = new Date(dashboardData.summary.currentYear, dashboardData.summary.currentMonth - 1, timeline.dates[dayIndex]);
+      const dayOfWeek = fullDate.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        td.classList.add('weekend');
+      }
+      
+      tr.appendChild(td);
+    });
+    
+    body.appendChild(tr);
+  });
+}
+
+/**
+ * Show/hide sections
+ */
+function showLoading() {
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'none';
+}
+
+function hideLoading() {
+  document.getElementById('loading').style.display = 'none';
+}
+
+function showError(message) {
+  document.getElementById('errorMessage').textContent = message;
+  document.getElementById('error').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+}
+
+function showDashboard() {
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+}
+
+/**
+ * Utility functions
+ */
+function formatDate(date) {
+  const options = { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    weekday: 'long'
+  };
+  return date.toLocaleDateString('vi-VN', options);
+}
+
+// Error handling for google.script.run
+window.addEventListener('error', function(e) {
+  console.error('JavaScript error:', e.error);
+  if (document.getElementById('loading').style.display !== 'none') {
+    showError('Có lỗi xảy ra. Vui lòng tải lại trang.');
+  }
+});
+</script>

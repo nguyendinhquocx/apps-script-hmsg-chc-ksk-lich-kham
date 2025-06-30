@@ -1,0 +1,259 @@
+<style>
+/* Reset & Base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: #ffffff;
+  color: #000000;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100vh;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+  color: #666666;
+}
+
+.btn-refresh {
+  background: #000000;
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn-refresh:hover {
+  background: #333333;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: #666666;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #e0e0e0;
+  border-top: 2px solid #000000;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Error */
+.error {
+  text-align: center;
+  padding: 32px;
+  color: #666666;
+}
+
+.btn-retry {
+  background: #000000;
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+/* Summary */
+.summary {
+  display: flex;
+  gap: 32px;
+  margin-bottom: 32px;
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 14px;
+  color: #666666;
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #000000;
+}
+
+/* Timeline Table */
+.timeline-container {
+  overflow-x: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.timeline-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  min-width: 800px;
+}
+
+.timeline-table th,
+.timeline-table td {
+  padding: 12px 8px;
+  text-align: center;
+  border-right: 1px solid #e0e0e0;
+  white-space: nowrap;
+}
+
+.timeline-table th {
+  background: #f5f5f5;
+  font-weight: 600;
+  color: #000000;
+  border-bottom: 2px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.company-column {
+  text-align: left !important;
+  min-width: 200px;
+  max-width: 250px;
+  position: sticky;
+  left: 0;
+  background: #f5f5f5 !important;
+  z-index: 11;
+}
+
+.timeline-table td.company-cell {
+  text-align: left;
+  font-weight: 500;
+  background: #ffffff;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  border-right: 2px solid #e0e0e0;
+}
+
+.timeline-table tr:nth-child(even) td.company-cell {
+  background: #fafafa;
+}
+
+.timeline-table tr:hover td {
+  background: #f0f0f0;
+}
+
+.timeline-table tr:hover td.company-cell {
+  background: #e0e0e0 !important;
+}
+
+/* Total row */
+.timeline-table tr.total-row {
+  border-top: 2px solid #000000;
+  font-weight: 600;
+}
+
+.timeline-table tr.total-row td {
+  background: #f5f5f5;
+}
+
+.timeline-table tr.total-row td.company-cell {
+  background: #e0e0e0 !important;
+}
+
+/* Data cells */
+.data-cell {
+  font-weight: 500;
+  position: relative;
+}
+
+.data-cell.has-data {
+  background: #f0f0f0;
+  color: #000000;
+}
+
+.data-cell.empty {
+  color: #cccccc;
+}
+
+/* Weekend styling */
+.weekend {
+  background: #f8f8f8 !important;
+}
+
+.timeline-table th.weekend {
+  background: #f0f0f0 !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+  
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .summary {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .timeline-table {
+    font-size: 14px;
+  }
+  
+  .timeline-table th,
+  .timeline-table td {
+    padding: 8px 4px;
+  }
+}
+</style>

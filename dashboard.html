@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Lịch Khám - HMSG CHC</title>
+  <?!= include('dashboard_styles'); ?>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Dashboard Lịch Khám</h1>
+      <div class="header-info">
+        <span id="currentDate"></span>
+        <button id="refreshBtn" class="btn-refresh">Làm mới</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="loading">
+      <div class="loading-spinner"></div>
+      <p>Đang tải dữ liệu...</p>
+    </div>
+
+    <!-- Error -->
+    <div id="error" class="error" style="display: none;">
+      <p id="errorMessage"></p>
+      <button onclick="loadData()" class="btn-retry">Thử lại</button>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div id="dashboard" class="dashboard" style="display: none;">
+      <!-- Summary -->
+      <div class="summary">
+        <div class="summary-item">
+          <span class="summary-label">Tổng công ty:</span>
+          <span id="totalCompanies" class="summary-value">0</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Tháng hiện tại:</span>
+          <span id="currentMonth" class="summary-value">0/0</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Tối đa/ngày:</span>
+          <span id="maxPeoplePerDay" class="summary-value">0</span>
+        </div>
+      </div>
+
+      <!-- Timeline Table -->
+      <div class="timeline-container">
+        <table id="timelineTable" class="timeline-table">
+          <thead>
+            <tr id="timelineHeader">
+              <th class="company-column">Công ty</th>
+            </tr>
+          </thead>
+          <tbody id="timelineBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <?!= include('dashboard_scripts'); ?>
+</body>
+</html>
