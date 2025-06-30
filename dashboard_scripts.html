@@ -32,7 +32,6 @@ function initializeApp() {
     refreshData();
   });
   
-  // Update month display
   updateMonthDisplay();
 }
 
@@ -117,19 +116,65 @@ function renderStats(summary) {
   document.getElementById('averagePerDay').textContent = summary.averagePerDay || 0;
 }
 
+/**
+ * Rút gọn tên công ty - Improved
+ */
+function shortenCompanyName(fullName) {
+  const shortcuts = {
+    'CÔNG TY CỔ PHẦN': 'CP',
+    'CÔNG TY TNHH': 'TNHH',
+    'CHI NHÁNH CÔNG TY': 'CN',
+    'CÔNG TY CP': 'CP',
+    'XUẤT NHẬP KHẨU': 'XNK',
+    'THƯƠNG MẠI': 'TM',
+    'DỊCH VỤ': 'DV',
+    'KINH DOANH': 'KD',
+    'PHÁT TRIỂN': 'PT',
+    'ĐẦU TƯ': 'ĐT',
+    'SẢN XUẤT': 'SX',
+    'LOGISTICS': 'LOG',
+    'INTERNATIONAL': 'INTL',
+    'DEVELOPMENT': 'DEV',
+    'TECHNOLOGY': 'TECH',
+    'SOLUTIONS': 'SOL',
+    'EDUCATION': 'EDU',
+    'SOFTWARE': 'SW'
+  };
+  
+  let shortened = fullName;
+  
+  // Apply shortcuts
+  Object.keys(shortcuts).forEach(key => {
+    const regex = new RegExp(key, 'gi');
+    shortened = shortened.replace(regex, shortcuts[key]);
+  });
+  
+  // Limit length
+  if (shortened.length > 25) {
+    shortened = shortened.substring(0, 22) + '...';
+  }
+  
+  return shortened;
+}
+
+/**
+ * Create tooltip content
+ */
+function createTooltip(companyName, date, peopleCount) {
+  return `${companyName}\nNgày ${date}: ${peopleCount} người khám`;
+}
+
 function renderTimeline(timeline) {
   if (!timeline.dates || timeline.dates.length === 0) {
     document.getElementById('timelineBody').innerHTML = 
-      '<tr><td colspan="100%" style="text-align: center; padding: 20px;">Không có dữ liệu</td></tr>';
+      '<tr><td colspan="100%" style="text-align: center; padding: 20px; color: #64748b;">Không có dữ liệu</td></tr>';
     return;
   }
   
   // Clear existing content
-  const weekdayRow = document.getElementById('weekdayRow');
   const dateRow = document.getElementById('dateRow');
   const tbody = document.getElementById('timelineBody');
   
-  weekdayRow.innerHTML = '<th class="company-header"></th>';
   dateRow.innerHTML = '<th class="company-header">Công ty</th>';
   tbody.innerHTML = '';
   
@@ -137,14 +182,8 @@ function renderTimeline(timeline) {
   const isCurrentMonth = (currentMonth === today.getMonth() + 1) && (currentYear === today.getFullYear());
   const todayDate = today.getDate();
   
-  // Create weekday and date headers
+  // Create date headers (no weekdays)
   timeline.dates.forEach((date, index) => {
-    // Weekday header
-    const weekdayTh = document.createElement('th');
-    weekdayTh.textContent = timeline.weekdays[index];
-    weekdayTh.classList.add('weekday-header');
-    
-    // Date header
     const dateTh = document.createElement('th');
     dateTh.textContent = date;
     dateTh.classList.add('date-header');
@@ -153,7 +192,6 @@ function renderTimeline(timeline) {
     const fullDate = new Date(currentYear, currentMonth - 1, date);
     const dayOfWeek = fullDate.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-      weekdayTh.classList.add('weekend');
       dateTh.classList.add('weekend');
     }
     
@@ -162,7 +200,6 @@ function renderTimeline(timeline) {
       dateTh.classList.add('today');
     }
     
-    weekdayRow.appendChild(weekdayTh);
     dateRow.appendChild(dateTh);
   });
   
@@ -174,14 +211,17 @@ function renderTimeline(timeline) {
       tr.classList.add('total-row');
     }
     
-    // Company name cell
+    // Company name cell with shortened name
     const companyCell = document.createElement('td');
     companyCell.classList.add('company-cell');
-    companyCell.textContent = row.company;
-    companyCell.title = row.company; // Tooltip for long names
+    
+    const displayName = row.company === 'TỔNG' ? 'TỔNG' : shortenCompanyName(row.company);
+    companyCell.textContent = displayName;
+    companyCell.title = row.company; // Full name on hover
+    
     tr.appendChild(companyCell);
     
-    // Data cells
+    // Data cells with tooltips
     row.data.forEach((value, dayIndex) => {
       const td = document.createElement('td');
       td.classList.add('data-cell');
@@ -189,8 +229,18 @@ function renderTimeline(timeline) {
       if (value > 0) {
         td.textContent = value;
         td.classList.add('has-data');
+        
+        // Highlight high volume (>10 people)
+        if (value > 10) {
+          td.classList.add('high-volume');
+        }
+        
+        // Add tooltip
+        const tooltipText = createTooltip(row.company, timeline.dates[dayIndex], value);
+        td.title = tooltipText;
+        
       } else {
-        td.textContent = '—';
+        td.textContent = '';
         td.classList.add('empty');
       }
       
@@ -235,7 +285,7 @@ function showDashboard() {
   document.getElementById('dashboard').style.display = 'block';
 }
 
-// Keyboard shortcuts
+// Enhanced keyboard shortcuts
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey) {
     switch(e.key) {
@@ -250,6 +300,10 @@ document.addEventListener('keydown', (e) => {
       case 'ArrowRight':
         e.preventDefault();
         navigateMonth(1);
+        break;
+      case 'f':
+        e.preventDefault();
+        document.getElementById('showCompleted').click();
         break;
     }
   }
