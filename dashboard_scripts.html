@@ -1,46 +1,83 @@
 <script>
-// Global variables
+// Global state
+let currentMonth = new Date().getMonth() + 1;
+let currentYear = new Date().getFullYear();
+let showCompleted = false;
 let dashboardData = null;
 
-// Initialize dashboard
+// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-  initializeDashboard();
-  loadData();
+  initializeApp();
+  loadCurrentMonth();
 });
 
-/**
- * Initialize dashboard elements
- */
-function initializeDashboard() {
-  // Set current date
-  const now = new Date();
-  const currentDateElement = document.getElementById('currentDate');
-  if (currentDateElement) {
-    currentDateElement.textContent = formatDate(now);
-  }
+function initializeApp() {
+  // Month navigation
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    navigateMonth(-1);
+  });
+  
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    navigateMonth(1);
+  });
+  
+  // Filter checkbox
+  document.getElementById('showCompleted').addEventListener('change', (e) => {
+    showCompleted = e.target.checked;
+    loadData();
+  });
   
   // Refresh button
-  const refreshBtn = document.getElementById('refreshBtn');
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', refreshData);
-  }
+  document.getElementById('refreshBtn').addEventListener('click', () => {
+    refreshData();
+  });
+  
+  // Update month display
+  updateMonthDisplay();
 }
 
-/**
- * Load data from backend
- */
+function navigateMonth(direction) {
+  currentMonth += direction;
+  
+  if (currentMonth > 12) {
+    currentMonth = 1;
+    currentYear++;
+  } else if (currentMonth < 1) {
+    currentMonth = 12;
+    currentYear--;
+  }
+  
+  updateMonthDisplay();
+  loadData();
+}
+
+function updateMonthDisplay() {
+  const monthNames = [
+    '', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+  ];
+  
+  document.getElementById('currentMonthDisplay').textContent = 
+    `${monthNames[currentMonth]} ${currentYear}`;
+}
+
+function loadCurrentMonth() {
+  const now = new Date();
+  currentMonth = now.getMonth() + 1;
+  currentYear = now.getFullYear();
+  updateMonthDisplay();
+  loadData();
+}
+
 function loadData() {
   showLoading();
   
   google.script.run
     .withSuccessHandler(onDataLoaded)
     .withFailureHandler(onDataError)
-    .getScheduleData();
+    .getScheduleData(currentMonth, currentYear, showCompleted);
 }
 
-/**
- * Refresh data
- */
 function refreshData() {
   showLoading();
   
@@ -50,9 +87,6 @@ function refreshData() {
     .refreshCache();
 }
 
-/**
- * Handle successful data load
- */
 function onDataLoaded(data) {
   hideLoading();
   
@@ -66,69 +100,76 @@ function onDataLoaded(data) {
   showDashboard();
 }
 
-/**
- * Handle data load error
- */
 function onDataError(error) {
   hideLoading();
-  showError('Không thể tải dữ liệu. Vui lòng thử lại.');
-  console.error('Error loading data:', error);
+  showError(error.message || 'Không thể tải dữ liệu. Vui lòng thử lại.');
+  console.error('Error:', error);
 }
 
-/**
- * Render dashboard with data
- */
 function renderDashboard(data) {
-  renderSummary(data.summary);
+  renderStats(data.summary);
   renderTimeline(data.timeline);
 }
 
-/**
- * Render summary section
- */
-function renderSummary(summary) {
-  document.getElementById('totalCompanies').textContent = summary.totalCompanies;
-  document.getElementById('currentMonth').textContent = `${summary.currentMonth}/${summary.currentYear}`;
-  document.getElementById('maxPeoplePerDay').textContent = summary.maxPeoplePerDay;
+function renderStats(summary) {
+  document.getElementById('pendingCompanies').textContent = summary.pendingCompanies || 0;
+  document.getElementById('completedCompanies').textContent = summary.completedCompanies || 0;
+  document.getElementById('averagePerDay').textContent = summary.averagePerDay || 0;
 }
 
-/**
- * Render timeline table
- */
 function renderTimeline(timeline) {
-  const table = document.getElementById('timelineTable');
-  const header = document.getElementById('timelineHeader');
-  const body = document.getElementById('timelineBody');
-  
-  // Clear existing content
-  header.innerHTML = '<th class="company-column">Công ty</th>';
-  body.innerHTML = '';
-  
   if (!timeline.dates || timeline.dates.length === 0) {
-    body.innerHTML = '<tr><td colspan="100%">Không có dữ liệu</td></tr>';
+    document.getElementById('timelineBody').innerHTML = 
+      '<tr><td colspan="100%" style="text-align: center; padding: 20px;">Không có dữ liệu</td></tr>';
     return;
   }
   
-  // Create header with dates
-  timeline.dates.forEach(date => {
-    const th = document.createElement('th');
-    th.textContent = date;
+  // Clear existing content
+  const weekdayRow = document.getElementById('weekdayRow');
+  const dateRow = document.getElementById('dateRow');
+  const tbody = document.getElementById('timelineBody');
+  
+  weekdayRow.innerHTML = '<th class="company-header"></th>';
+  dateRow.innerHTML = '<th class="company-header">Công ty</th>';
+  tbody.innerHTML = '';
+  
+  const today = new Date();
+  const isCurrentMonth = (currentMonth === today.getMonth() + 1) && (currentYear === today.getFullYear());
+  const todayDate = today.getDate();
+  
+  // Create weekday and date headers
+  timeline.dates.forEach((date, index) => {
+    // Weekday header
+    const weekdayTh = document.createElement('th');
+    weekdayTh.textContent = timeline.weekdays[index];
+    weekdayTh.classList.add('weekday-header');
+    
+    // Date header
+    const dateTh = document.createElement('th');
+    dateTh.textContent = date;
+    dateTh.classList.add('date-header');
     
     // Mark weekends
-    const fullDate = new Date(dashboardData.summary.currentYear, dashboardData.summary.currentMonth - 1, date);
+    const fullDate = new Date(currentYear, currentMonth - 1, date);
     const dayOfWeek = fullDate.getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-      th.classList.add('weekend');
+      weekdayTh.classList.add('weekend');
+      dateTh.classList.add('weekend');
     }
     
-    header.appendChild(th);
+    // Mark today
+    if (isCurrentMonth && date === todayDate) {
+      dateTh.classList.add('today');
+    }
+    
+    weekdayRow.appendChild(weekdayTh);
+    dateRow.appendChild(dateTh);
   });
   
   // Create data rows
-  timeline.rows.forEach((row, index) => {
+  timeline.rows.forEach(row => {
     const tr = document.createElement('tr');
     
-    // Add total row class
     if (row.company === 'TỔNG') {
       tr.classList.add('total-row');
     }
@@ -137,6 +178,7 @@ function renderTimeline(timeline) {
     const companyCell = document.createElement('td');
     companyCell.classList.add('company-cell');
     companyCell.textContent = row.company;
+    companyCell.title = row.company; // Tooltip for long names
     tr.appendChild(companyCell);
     
     // Data cells
@@ -153,22 +195,25 @@ function renderTimeline(timeline) {
       }
       
       // Mark weekends
-      const fullDate = new Date(dashboardData.summary.currentYear, dashboardData.summary.currentMonth - 1, timeline.dates[dayIndex]);
+      const fullDate = new Date(currentYear, currentMonth - 1, timeline.dates[dayIndex]);
       const dayOfWeek = fullDate.getDay();
       if (dayOfWeek === 0 || dayOfWeek === 6) {
         td.classList.add('weekend');
       }
       
+      // Mark today
+      if (isCurrentMonth && timeline.dates[dayIndex] === todayDate) {
+        td.classList.add('today');
+      }
+      
       tr.appendChild(td);
     });
     
-    body.appendChild(tr);
+    tbody.appendChild(tr);
   });
 }
 
-/**
- * Show/hide sections
- */
+// UI State Management
 function showLoading() {
   document.getElementById('loading').style.display = 'flex';
   document.getElementById('error').style.display = 'none';
@@ -190,24 +235,38 @@ function showDashboard() {
   document.getElementById('dashboard').style.display = 'block';
 }
 
-/**
- * Utility functions
- */
-function formatDate(date) {
-  const options = { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric',
-    weekday: 'long'
-  };
-  return date.toLocaleDateString('vi-VN', options);
-}
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    switch(e.key) {
+      case 'r':
+        e.preventDefault();
+        refreshData();
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        navigateMonth(-1);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        navigateMonth(1);
+        break;
+    }
+  }
+});
 
-// Error handling for google.script.run
-window.addEventListener('error', function(e) {
+// Error handling
+window.addEventListener('error', (e) => {
   console.error('JavaScript error:', e.error);
   if (document.getElementById('loading').style.display !== 'none') {
     showError('Có lỗi xảy ra. Vui lòng tải lại trang.');
   }
 });
+
+// Auto-refresh every 5 minutes
+setInterval(() => {
+  if (document.getElementById('dashboard').style.display === 'block') {
+    loadData();
+  }
+}, 5 * 60 * 1000);
 </script>

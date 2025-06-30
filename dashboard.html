@@ -4,61 +4,81 @@
   <base target="_top">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Lịch Khám - HMSG CHC</title>
+  <title>Lịch khám sức khoẻ công ty</title>
   <?!= include('dashboard_styles'); ?>
 </head>
 <body>
   <div class="container">
-    <!-- Header -->
+    <!-- Header với navigation -->
     <div class="header">
-      <h1>Dashboard Lịch Khám</h1>
-      <div class="header-info">
-        <span id="currentDate"></span>
-        <button id="refreshBtn" class="btn-refresh">Làm mới</button>
+      <div class="header-left">
+        <h1>Lịch khám sức khoẻ công ty</h1>
+        <div class="month-nav">
+          <button id="prevMonth" class="nav-btn">‹</button>
+          <span id="currentMonthDisplay">Tháng 6</span>
+          <button id="nextMonth" class="nav-btn">›</button>
+        </div>
+      </div>
+      
+      <div class="header-right">
+        <div class="filter-group">
+          <label class="filter-label">
+            <input type="checkbox" id="showCompleted" class="filter-checkbox">
+            <span class="filter-text">Hiện đã khám xong</span>
+          </label>
+        </div>
+        <button id="refreshBtn" class="update-btn" title="Cập nhật">↻</button>
       </div>
     </div>
 
     <!-- Loading -->
     <div id="loading" class="loading">
       <div class="loading-spinner"></div>
-      <p>Đang tải dữ liệu...</p>
+      <div class="loading-text">Đang tải...</div>
     </div>
 
     <!-- Error -->
     <div id="error" class="error" style="display: none;">
-      <p id="errorMessage"></p>
-      <button onclick="loadData()" class="btn-retry">Thử lại</button>
+      <div id="errorMessage" class="error-message"></div>
+      <button onclick="loadCurrentMonth()" class="retry-btn">Thử lại</button>
     </div>
 
     <!-- Dashboard Content -->
     <div id="dashboard" class="dashboard" style="display: none;">
-      <!-- Summary -->
-      <div class="summary">
-        <div class="summary-item">
-          <span class="summary-label">Tổng công ty:</span>
-          <span id="totalCompanies" class="summary-value">0</span>
+      <!-- Statistics -->
+      <div class="stats">
+        <div class="stat-item">
+          <div class="stat-value" id="pendingCompanies">0</div>
+          <div class="stat-label">Chưa khám</div>
         </div>
-        <div class="summary-item">
-          <span class="summary-label">Tháng hiện tại:</span>
-          <span id="currentMonth" class="summary-value">0/0</span>
+        
+        <div class="stat-item">
+          <div class="stat-value" id="completedCompanies">0</div>
+          <div class="stat-label">Đã khám</div>
         </div>
-        <div class="summary-item">
-          <span class="summary-label">Tối đa/ngày:</span>
-          <span id="maxPeoplePerDay" class="summary-value">0</span>
+        
+        <div class="stat-item">
+          <div class="stat-value" id="averagePerDay">0</div>
+          <div class="stat-label">Trung bình ngày</div>
         </div>
       </div>
 
-      <!-- Timeline Table -->
-      <div class="timeline-container">
-        <table id="timelineTable" class="timeline-table">
-          <thead>
-            <tr id="timelineHeader">
-              <th class="company-column">Công ty</th>
-            </tr>
-          </thead>
-          <tbody id="timelineBody">
-          </tbody>
-        </table>
+      <!-- Timeline -->
+      <div class="timeline-wrapper">
+        <div class="timeline-container">
+          <table id="timelineTable" class="timeline-table">
+            <thead>
+              <tr id="weekdayRow" class="weekday-row">
+                <th class="company-header"></th>
+              </tr>
+              <tr id="dateRow" class="date-row">
+                <th class="company-header">Công ty</th>
+              </tr>
+            </thead>
+            <tbody id="timelineBody">
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
