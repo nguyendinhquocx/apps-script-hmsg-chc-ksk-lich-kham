@@ -232,12 +232,17 @@ function calculateStats(rows) {
   let totalCompanies = 0;
   let completedCompanies = 0;
   let activeCompanies = 0;
+  let pendingCompanies = 0;
   let totalPeople = 0;
-  let totalDaysWithData = 0;
-  let totalPeopleForAverage = 0;
   
+  // Calculate total days in the current month for average calculation
+  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  
+  // Create a map to store daily totals for the filtered data
+  const dailyTotalsFiltered = {};
+
   rows.forEach(row => {
-    if (row.isSpacing || row.company === 'TỔNG') return;
+    if (row.isSpacing || row.company === 'TỔNG') return; // Skip spacing and original total row
     
     totalCompanies++;
     
@@ -250,11 +255,15 @@ function calculateStats(rows) {
       if (value > 0) {
         hasExaminations = true;
         companyTotal += value;
-        const examDate = dashboardData.timeline.dates[index];
         
-        if (examDate < currentDate) {
+        // Accumulate daily totals for filtered data
+        const dayOfMonth = dashboardData.timeline.dates[index]; // Use dates from the original timeline for correct day mapping
+        const dateKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}`;
+        dailyTotalsFiltered[dateKey] = (dailyTotalsFiltered[dateKey] || 0) + value;
+
+        if (dayOfMonth < currentDate) {
           hasCompletedExams = true;
-        } else if (examDate >= currentDate) {
+        } else if (dayOfMonth >= currentDate) {
           hasActiveExams = true;
         }
       }
@@ -273,19 +282,19 @@ function calculateStats(rows) {
     }
   });
   
-  // Pending companies = Total companies - Completed companies
-  const pendingCompanies = totalCompanies - completedCompanies;
+  // Pending companies = Total companies - Completed companies - Active companies
+  pendingCompanies = totalCompanies - completedCompanies - activeCompanies;
   
-  // Calculate average per day based on total people and days in month
-  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-  const averagePerDay = daysInMonth > 0 ? Math.round(totalPeople / daysInMonth) : 0;
+  // Calculate average per day based on filtered daily totals
+  const totalPeopleInFilteredDays = Object.values(dailyTotalsFiltered).reduce((sum, val) => sum + val, 0);
+  const averagePerDay = daysInMonth > 0 ? Math.round(totalPeopleInFilteredDays / daysInMonth) : 0;
   
   return {
     totalCompanies,
     completedCompanies,
     activeCompanies,
     pendingCompanies,
-    totalPeople,
+    totalPeople: totalPeopleInFilteredDays, // Use the sum of filtered daily totals
     averagePerDay
   };
 }
@@ -415,24 +424,10 @@ function renderTimeline(timeline) {
   timeline.rows.forEach(row => {
     const tr = document.createElement('tr');
     
-    // Handle spacing row
-    if (row.isSpacing) {
-      tr.classList.add('spacing-row');
-      const spacingCell = document.createElement('td');
-      spacingCell.colSpan = timeline.dates.length + 2; // +2 for company, people columns
-      tr.appendChild(spacingCell);
-      tbody.appendChild(tr);
-      return;
-    }
-    
-    if (row.company === 'TỔNG') {
-      tr.classList.add('total-row');
-    }
-    
     // Company name cell
     const companyCell = document.createElement('td');
     companyCell.classList.add('company-cell');
-    const displayName = row.company === 'TỔNG' ? 'TỔNG' : shortenCompanyName(row.company);
+    const displayName = shortenCompanyName(row.company);
     companyCell.textContent = displayName;
     companyCell.title = row.company; // Full name on hover
     tr.appendChild(companyCell);
@@ -442,8 +437,6 @@ function renderTimeline(timeline) {
     peopleCell.classList.add('people-cell');
     if (row.total > 0) {
       peopleCell.textContent = formatNumber(row.total);
-    } else if (row.total === '') {
-      peopleCell.textContent = '';
     } else {
       peopleCell.textContent = '0';
     }
@@ -470,9 +463,6 @@ function renderTimeline(timeline) {
         const tooltipText = createTooltip(row.company, timeline.dates[dayIndex], value);
         td.title = tooltipText;
         
-      } else if (value === '') {
-        inner.textContent = '';
-        // No classes for spacing cells
       } else {
         inner.textContent = '';
         td.classList.add('empty');
@@ -490,6 +480,61 @@ function renderTimeline(timeline) {
     
     tbody.appendChild(tr);
   });
+
+  // Calculate daily totals for the currently displayed companies
+  const dailyTotalsFiltered = new Array(timeline.dates.length).fill(0);
+  timeline.rows.forEach(row => {
+    row.data.forEach((value, index) => {
+      dailyTotalsFiltered[index] += value;
+    });
+  });
+
+  // Add spacing row
+  const spacingTr = document.createElement('tr');
+  spacingTr.classList.add('spacing-row');
+  const spacingCell = document.createElement('td');
+  spacingCell.colSpan = timeline.dates.length + 2; // +2 for company, people columns
+  spacingTr.appendChild(spacingCell);
+  tbody.appendChild(spacingTr);
+
+  // Add total row
+  const totalTr = document.createElement('tr');
+  totalTr.classList.add('total-row');
+
+  const totalCompanyCell = document.createElement('td');
+  totalCompanyCell.classList.add('company-cell');
+  totalCompanyCell.textContent = 'TỔNG';
+  totalTr.appendChild(totalCompanyCell);
+
+  const totalPeopleCell = document.createElement('td');
+  totalPeopleCell.classList.add('people-cell');
+  const grandTotal = dailyTotalsFiltered.reduce((sum, val) => sum + val, 0);
+  totalPeopleCell.textContent = formatNumber(grandTotal);
+  totalTr.appendChild(totalPeopleCell);
+
+  dailyTotalsFiltered.forEach((total, dayIndex) => {
+    const td = document.createElement('td');
+    td.classList.add('data-cell');
+    const inner = document.createElement('div');
+    inner.classList.add('data-cell-inner');
+    inner.textContent = total > 0 ? total : '';
+    if (total > 0) {
+      td.classList.add('has-data');
+      if (total > 100) {
+        td.classList.add('high-volume');
+      }
+    } else {
+      td.classList.add('empty');
+    }
+    // Mark weekends for total row
+    const weekday = timeline.weekdays[dayIndex];
+    if (weekday === 'CN' || weekday === 'T7') {
+      td.classList.add('weekend');
+    }
+    td.appendChild(inner);
+    totalTr.appendChild(td);
+  });
+  tbody.appendChild(totalTr);
 }
 
 // UI State Management

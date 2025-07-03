@@ -1,5 +1,5 @@
 /**
- * Lịch khám sức khoẻ công ty - HMSG CHC
+ * Lịch khám sức khoẻ công ty - HMSG CHC QUOC
  * Phiên bản 2.1 - Cải tiến UX
  * Tác giả: System Auto-generated
  * Ngày: 2025-06-30
@@ -188,6 +188,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
   const dailyTotals = {};
   const companyStatus = {};
   const companyTotals = {}; // Tổng mỗi công ty
+  const companyEmployees = {}; // Map company to employee
   const employees = new Set(); // Danh sách nhân viên
   
   // Lọc dữ liệu có giao thoa với tháng target
@@ -214,9 +215,13 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
     
     if (!startDate || !endDate || soNguoiKham === 0) return;
     
-    // Thu thập nhân viên
+    // Thu thập nhân viên và map với công ty
     if (record.tenNhanVien) {
-      employees.add(record.tenNhanVien.trim());
+      const employeeName = record.tenNhanVien.trim();
+      employees.add(employeeName);
+      if (!companyEmployees[companyName]) {
+        companyEmployees[companyName] = employeeName;
+      }
     }
     
     // Lưu trạng thái công ty
@@ -282,7 +287,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
     });
   }
   
-  const timeline = createTimelineData(companySchedules, dailyTotals, companyTotals, targetMonth, targetYear);
+  const timeline = createTimelineData(companySchedules, dailyTotals, companyTotals, targetMonth, targetYear, companyEmployees);
   
   return {
     success: true,
@@ -305,7 +310,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
 /**
  * Tạo timeline data với sắp xếp theo tổng số ngày khám (nhiều nhất ở dưới)
  */
-function createTimelineData(companySchedules, dailyTotals, companyTotals, month, year) {
+function createTimelineData(companySchedules, dailyTotals, companyTotals, month, year, companyEmployees) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const timeline = [];
   
@@ -329,6 +334,7 @@ function createTimelineData(companySchedules, dailyTotals, companyTotals, month,
   sortedCompanies.forEach(companyName => {
     const row = {
       company: companyName,
+      employee: companyEmployees[companyName] || '',
       data: [],
       total: companyTotals[companyName] || 0
     };
@@ -341,32 +347,6 @@ function createTimelineData(companySchedules, dailyTotals, companyTotals, month,
     
     timeline.push(row);
   });
-  
-  // Dòng tổng với khoảng cách
-  if (timeline.length > 0) {
-    // Thêm dòng trống để tạo khoảng cách
-    timeline.push({
-      company: '',
-      data: new Array(daysInMonth).fill(''),
-      total: '',
-      isSpacing: true
-    });
-  }
-  
-  const totalRow = {
-    company: 'TỔNG',
-    data: [],
-    total: 0
-  };
-  
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateKey = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    const totalPeople = dailyTotals[dateKey] || 0;
-    totalRow.data.push(totalPeople);
-    totalRow.total += totalPeople;
-  }
-  
-  timeline.push(totalRow);
   
   return {
     dates: dates,
