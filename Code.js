@@ -1,6 +1,6 @@
 /**
  * Lịch khám sức khoẻ công ty - HMSG CHC
- * Phiên bản 2.0 - Thiết kế tối giản
+ * Phiên bản 2.1 - Cải tiến UX
  * Tác giả: System Auto-generated
  * Ngày: 2025-06-30
  */
@@ -10,7 +10,8 @@ const CONFIG = {
   SHEET_ID: '15eMfEvqNvy1qBNG1NXwr7eSBsYZA6KqlBB3lTyzTfhM',
   SHEET_NAME: 'chc',
   CACHE_DURATION: 300,
-  DATE_FORMAT: 'dd/MM/yyyy'
+  DATE_FORMAT: 'dd/MM/yyyy',
+  HIGH_VOLUME_THRESHOLD: 50
 };
 
 function doGet(e) {
@@ -27,13 +28,13 @@ function include(filename) {
 /**
  * Lấy dữ liệu với tháng cụ thể và filter trạng thái
  */
-function getScheduleData(month = null, year = null, showCompleted = false) {
+function getScheduleData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '') {
   try {
     const currentDate = new Date();
     const targetMonth = month || (currentDate.getMonth() + 1);
     const targetYear = year || currentDate.getFullYear();
     
-    const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}`;
+    const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}_${searchCompany}_${filterEmployee}`;
     const cache = CacheService.getScriptCache();
     const cachedData = cache.get(cacheKey);
     
@@ -70,27 +71,30 @@ function getScheduleData(month = null, year = null, showCompleted = false) {
       return record;
     });
 
-    // Lọc theo trạng thái khám
-    const filteredData = rawData.filter(record => {
+    // Lọc theo search và employee
+    let filteredData = rawData.filter(record => {
       if (!record.tenCongTy || !record.ngayBatDau || !record.ngayKetThuc || !record.soNguoiKham) {
         return false;
       }
       
-      // Filter theo trạng thái khám
-      if (!showCompleted && record.trangThaiKham) {
-        const status = record.trangThaiKham.toLowerCase().trim();
-        if (status === 'đã khám xong' || status === 'da kham xong') {
-          return false;
-        }
+      // Search filter
+      if (searchCompany && !record.tenCongTy.toLowerCase().includes(searchCompany.toLowerCase())) {
+        return false;
       }
       
+      // Employee filter
+      if (filterEmployee && record.tenNhanVien && !record.tenNhanVien.toLowerCase().includes(filterEmployee.toLowerCase())) {
+        return false;
+      }
+      
+      // Status filter - Cải tiến: luôn tính cả completed và pending
       return true;
     });
 
     console.log(`Dữ liệu sau filter: ${filteredData.length} records`);
 
     // Tổng hợp dữ liệu
-    const processedData = processScheduleData(filteredData, targetMonth, targetYear);
+    const processedData = processScheduleData(filteredData, targetMonth, targetYear, showCompleted);
     
     // Cache kết quả
     cache.put(cacheKey, JSON.stringify(processedData), CONFIG.CACHE_DURATION);
@@ -103,26 +107,28 @@ function getScheduleData(month = null, year = null, showCompleted = false) {
     return {
       success: false,
       error: error.message,
-      timeline: { dates: [], rows: [] },
-      summary: {}
+      timeline: { dates: [], weekdays: [], rows: [] },
+      summary: {},
+      employees: []
     };
   }
 }
 
 /**
- * Tìm index của các cột - bổ sung cột trạng thái khám
+ * Tìm index của các cột - bổ sung cột tên nhân viên
  */
 function getColumnIndexes(headers) {
   const requiredColumns = {
     'tenCongTy': ['ten cong ty', 'tên công ty'],
     'ngayBatDau': ['ngay bat dau kham', 'ngày bắt đầu khám'],
     'ngayKetThuc': ['ngay ket thuc kham', 'ngày kết thúc khám'],
-    'tongSoNgayKham': ['tong so ngay kham', 'tổng số ngày khám'],
+    'tongSoNgayKham': ['tong so ngay kham thuc te', 'tổng số ngày khám'],
     'trungBinhNgay': ['trung binh ngay', 'trung bình ngày'],
-    'sang': ['sang', 'sáng'],
-    'chieu': ['chieu', 'chiều'],
+    'sang': ['trung binh ngay sang', 'sáng'],
+    'chieu': ['trung binh ngay chieu', 'chiều'],
     'soNguoiKham': ['so nguoi kham', 'số người khám'],
-    'trangThaiKham': ['trang thai kham', 'trạng thái khám'] // Thêm cột mới
+    'trangThaiKham': ['trang thai kham', 'trạng thái khám'],
+    'tenNhanVien': ['ten nhan vien', 'tên nhân viên'] // Thêm cột mới
   };
   
   const indexes = {};
@@ -138,7 +144,7 @@ function getColumnIndexes(headers) {
       if (foundIndex !== -1) break;
     }
     
-    if (foundIndex === -1 && key !== 'trangThaiKham') { // trangThaiKham là optional
+    if (foundIndex === -1 && !['trangThaiKham', 'tenNhanVien'].includes(key)) {
       throw new Error(`Không tìm thấy cột '${possibleNames[0]}'`);
     }
     
@@ -151,12 +157,38 @@ function getColumnIndexes(headers) {
 }
 
 /**
- * Xử lý dữ liệu với tháng cụ thể
+ * Kiểm tra ngày có phải chủ nhật không
  */
-function processScheduleData(rawData, targetMonth, targetYear) {
+function isSunday(date) {
+  return date.getDay() === 0;
+}
+
+/**
+ * Điều chỉnh ngày để tránh chủ nhật
+ */
+function adjustForWorkingDays(startDate, endDate, totalDays) {
+  const workingDays = [];
+  const currentDate = new Date(startDate);
+  
+  while (currentDate <= endDate) {
+    if (!isSunday(currentDate)) {
+      workingDays.push(new Date(currentDate));
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  return workingDays;
+}
+
+/**
+ * Xử lý dữ liệu với tránh chủ nhật
+ */
+function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
   const companySchedules = {};
   const dailyTotals = {};
-  const companyStatus = {}; // Theo dõi trạng thái từng công ty
+  const companyStatus = {};
+  const companyTotals = {}; // Tổng mỗi công ty
+  const employees = new Set(); // Danh sách nhân viên
   
   // Lọc dữ liệu có giao thoa với tháng target
   const targetMonthData = rawData.filter(record => {
@@ -182,23 +214,34 @@ function processScheduleData(rawData, targetMonth, targetYear) {
     
     if (!startDate || !endDate || soNguoiKham === 0) return;
     
+    // Thu thập nhân viên
+    if (record.tenNhanVien) {
+      employees.add(record.tenNhanVien.trim());
+    }
+    
     // Lưu trạng thái công ty
     companyStatus[companyName] = trangThaiKham;
     
-    const nguoiKhamMoiNgay = Math.ceil(soNguoiKham / tongSoNgayKham);
-    
     if (!companySchedules[companyName]) {
       companySchedules[companyName] = {};
+      companyTotals[companyName] = 0;
     }
     
-    // Phân bổ người khám cho từng ngày
-    const currentDate = new Date(startDate);
-    let remainingPeople = soNguoiKham;
-    let remainingDays = tongSoNgayKham;
+    // Điều chỉnh lịch để tránh chủ nhật
+    const workingDays = adjustForWorkingDays(startDate, endDate, tongSoNgayKham);
+    const actualWorkingDays = Math.min(workingDays.length, tongSoNgayKham);
     
-    while (currentDate <= endDate && remainingDays > 0) {
-      if (currentDate.getMonth() + 1 === targetMonth && currentDate.getFullYear() === targetYear) {
-        const dateKey = formatDateKey(currentDate);
+    if (actualWorkingDays === 0) return;
+    
+    const nguoiKhamMoiNgay = Math.ceil(soNguoiKham / actualWorkingDays);
+    
+    // Phân bổ người khám cho từng ngày làm việc
+    let remainingPeople = soNguoiKham;
+    let remainingDays = actualWorkingDays;
+    
+    workingDays.slice(0, actualWorkingDays).forEach(workDate => {
+      if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
+        const dateKey = formatDateKey(workDate);
         const peopleToday = remainingDays === 1 ? 
           remainingPeople : 
           Math.min(nguoiKhamMoiNgay, remainingPeople);
@@ -207,13 +250,13 @@ function processScheduleData(rawData, targetMonth, targetYear) {
           (companySchedules[companyName][dateKey] || 0) + peopleToday;
         
         dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peopleToday;
+        companyTotals[companyName] += peopleToday;
         
         remainingPeople -= peopleToday;
       }
       
       remainingDays--;
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
+    });
   });
   
   // Tính thống kê trạng thái
@@ -227,12 +270,19 @@ function processScheduleData(rawData, targetMonth, targetYear) {
     }
   });
   
-  // Tính trung bình ngày
-  const totalDays = Object.values(dailyTotals).reduce((sum, val) => sum + val, 0);
-  const workingDays = Object.keys(dailyTotals).length;
-  const averagePerDay = workingDays > 0 ? Math.round(totalDays / workingDays) : 0;
+  // Nếu không hiển thị completed, loại bỏ khỏi timeline
+  if (!showCompleted) {
+    Object.keys(companySchedules).forEach(companyName => {
+      const status = companyStatus[companyName] || '';
+      const statusLower = status.toLowerCase().trim();
+      if (statusLower === 'đã khám xong' || statusLower === 'da kham xong') {
+        delete companySchedules[companyName];
+        delete companyTotals[companyName];
+      }
+    });
+  }
   
-  const timeline = createTimelineData(companySchedules, dailyTotals, targetMonth, targetYear);
+  const timeline = createTimelineData(companySchedules, dailyTotals, companyTotals, targetMonth, targetYear);
   
   return {
     success: true,
@@ -244,17 +294,18 @@ function processScheduleData(rawData, targetMonth, targetYear) {
       currentMonth: targetMonth,
       currentYear: targetYear,
       maxPeoplePerDay: Math.max(...Object.values(dailyTotals), 0),
-      averagePerDay: averagePerDay,
+      averagePerDay: Math.round(Object.values(dailyTotals).reduce((sum, val) => sum + val, 0) / Math.max(Object.keys(dailyTotals).length, 1)),
       totalRecords: rawData.length,
       processedRecords: targetMonthData.length
-    }
+    },
+    employees: Array.from(employees).sort()
   };
 }
 
 /**
- * Tạo timeline data với thứ trong tuần
+ * Tạo timeline data với sắp xếp theo tổng số ngày khám (nhiều nhất ở dưới)
  */
-function createTimelineData(companySchedules, dailyTotals, month, year) {
+function createTimelineData(companySchedules, dailyTotals, companyTotals, month, year) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const timeline = [];
   
@@ -270,27 +321,38 @@ function createTimelineData(companySchedules, dailyTotals, month, year) {
     weekdays.push(weekday);
   }
   
-  // Sắp xếp công ty theo tên
-  const sortedCompanies = Object.keys(companySchedules).sort();
+  // Sắp xếp công ty theo tổng số người khám (ít nhất ở trên, nhiều nhất ở dưới)
+  const sortedCompanies = Object.keys(companySchedules).sort((a, b) => {
+    return (companyTotals[a] || 0) - (companyTotals[b] || 0);
+  });
   
   sortedCompanies.forEach(companyName => {
     const row = {
       company: companyName,
       data: [],
-      total: 0
+      total: companyTotals[companyName] || 0
     };
     
     for (let day = 1; day <= daysInMonth; day++) {
       const dateKey = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
       const peopleCount = companySchedules[companyName][dateKey] || 0;
       row.data.push(peopleCount);
-      row.total += peopleCount;
     }
     
     timeline.push(row);
   });
   
-  // Dòng tổng
+  // Dòng tổng với khoảng cách
+  if (timeline.length > 0) {
+    // Thêm dòng trống để tạo khoảng cách
+    timeline.push({
+      company: '',
+      data: new Array(daysInMonth).fill(''),
+      total: '',
+      isSpacing: true
+    });
+  }
+  
   const totalRow = {
     company: 'TỔNG',
     data: [],
@@ -311,6 +373,33 @@ function createTimelineData(companySchedules, dailyTotals, month, year) {
     weekdays: weekdays,
     rows: timeline
   };
+}
+
+// Lấy danh sách nhân viên
+function getEmployeeList() {
+  try {
+    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
+    const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+    const range = sheet.getDataRange();
+    const values = range.getValues();
+    
+    const headers = values[0];
+    const columnIndexes = getColumnIndexes(headers);
+    
+    const employees = new Set();
+    
+    values.slice(1).forEach(row => {
+      if (columnIndexes.tenNhanVien && row[columnIndexes.tenNhanVien]) {
+        employees.add(row[columnIndexes.tenNhanVien].trim());
+      }
+    });
+    
+    return Array.from(employees).sort();
+    
+  } catch (error) {
+    console.error('Lỗi lấy danh sách nhân viên:', error);
+    return [];
+  }
 }
 
 // Các hàm utility giữ nguyên
@@ -383,7 +472,6 @@ function refreshCache() {
   const cache = CacheService.getScriptCache();
   cache.removeAll(['scheduleData']);
   
-  // Lấy dữ liệu mới
   const currentDate = new Date();
   return getScheduleData(currentDate.getMonth() + 1, currentDate.getFullYear(), false);
 }

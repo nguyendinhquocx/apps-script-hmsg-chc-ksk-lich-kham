@@ -83,14 +83,61 @@ body {
   color: #1a1a1a;
 }
 
-/* Header Right */
+/* Header Right với Search & Filters */
 .header-right {
   display: flex;
   align-items: center;
   gap: 20px;
 }
 
-/* Filter - Better styling */
+.search-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Search Input */
+.search-input {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #1a1a1a;
+  min-width: 180px;
+  transition: all 0.15s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.search-input::placeholder {
+  color: #94a3b8;
+}
+
+/* Filter Select */
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #1a1a1a;
+  min-width: 160px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Filter Checkbox */
 .filter-group {
   display: flex;
   align-items: center;
@@ -199,7 +246,7 @@ body {
   font-weight: 500;
 }
 
-/* Statistics - Cards with style */
+/* Statistics - Cards với completed luôn hiển thị */
 .stats {
   display: flex;
   gap: 20px;
@@ -238,6 +285,7 @@ body {
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  position: relative;
 }
 
 .timeline-container {
@@ -252,7 +300,43 @@ body {
   min-width: 900px;
 }
 
-/* Table Headers - Simplified */
+/* Resize Handle cho cột Company */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: var(--company-width, 180px);
+  width: 4px;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 20;
+  border-right: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.resize-handle:hover {
+  border-right-color: #2563eb;
+}
+
+.resize-handle.resizing {
+  border-right-color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+/* Table Headers - Với weekdays */
+.weekday-row th {
+  padding: 8px 6px;
+  text-align: center;
+  border-right: 1px solid #e2e8f0;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #64748b;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
 .date-row th {
   padding: 12px 6px;
   text-align: center;
@@ -261,22 +345,35 @@ body {
   font-weight: 600;
   background: #f8fafc;
   position: sticky;
-  top: 0;
+  top: 28px; /* Height of weekday row */
   z-index: 10;
   color: #1a1a1a;
 }
 
-/* Company column header */
+/* Company column header - Resizable */
 .company-header {
   text-align: left !important;
-  width: 180px;
-  min-width: 180px;
-  max-width: 180px;
+  width: var(--company-width, 180px);
+  min-width: 120px;
+  max-width: 300px;
   position: sticky;
   left: 0;
   background: #f8fafc !important;
   z-index: 11;
   border-right: 2px solid #e2e8f0 !important;
+  resize: horizontal;
+  overflow: hidden;
+}
+
+/* Total column header */
+.total-header {
+  text-align: center !important;
+  width: 80px;
+  min-width: 80px;
+  background: #f8fafc !important;
+  border-left: 2px solid #2563eb !important;
+  color: #2563eb !important;
+  font-weight: 700 !important;
 }
 
 /* Table Body - Better spacing */
@@ -289,7 +386,7 @@ body {
   white-space: nowrap;
 }
 
-/* Company name cells - Shortened */
+/* Company name cells */
 .company-cell {
   text-align: left !important;
   font-weight: 500 !important;
@@ -298,9 +395,9 @@ body {
   left: 0;
   z-index: 5;
   border-right: 2px solid #e2e8f0 !important;
-  width: 180px;
-  min-width: 180px;
-  max-width: 180px;
+  width: var(--company-width, 180px);
+  min-width: 120px;
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 12px;
@@ -308,7 +405,17 @@ body {
   color: #1a1a1a;
 }
 
-/* Data cells - Much better */
+/* Total cells */
+.total-cell {
+  background: #f8fafc !important;
+  font-weight: 700 !important;
+  color: #2563eb !important;
+  border-left: 2px solid #2563eb !important;
+  width: 80px;
+  min-width: 80px;
+}
+
+/* Data cells - Much better với highlight */
 .data-cell {
   position: relative;
   min-width: 36px;
@@ -326,8 +433,16 @@ body {
 }
 
 .data-cell.has-data.high-volume {
-  background: #1d4ed8;
-  font-weight: 700;
+  background: #dc2626 !important; /* Red cho >50 người */
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 
 .data-cell.empty {
@@ -350,13 +465,29 @@ body {
   color: #ffffff !important;
 }
 
+.timeline-table td.weekend.has-data.high-volume {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
 .timeline-table td.weekend.empty {
   background: #f1f5f9 !important;
 }
 
-/* Total row - Emphasized */
+/* Spacing row */
+.spacing-row {
+  height: 16px;
+}
+
+.spacing-row td {
+  background: #f8fafc;
+  border: none;
+  padding: 0;
+}
+
+/* Total row - Emphasized với khoảng cách */
 .total-row {
-  border-top: 2px solid #2563eb;
+  border-top: 3px solid #2563eb;
   background: #f8fafc;
 }
 
@@ -369,10 +500,16 @@ body {
   background: #f8fafc !important;
   font-weight: 700 !important;
   color: #2563eb !important;
+  font-size: 14px !important;
 }
 
 .total-row .data-cell.has-data {
   background: #2563eb;
+  color: #ffffff;
+}
+
+.total-row .data-cell.has-data.high-volume {
+  background: #dc2626 !important;
   color: #ffffff;
 }
 
@@ -381,43 +518,34 @@ body {
   color: #94a3b8;
 }
 
+.total-row .total-cell {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+}
+
 /* Hover effects - Refined */
-.timeline-table tbody tr:hover {
+.timeline-table tbody tr:hover:not(.spacing-row) {
   background: #f8fafc;
 }
 
-.timeline-table tbody tr:hover td:not(.company-cell) {
+.timeline-table tbody tr:hover:not(.spacing-row) td:not(.company-cell):not(.total-cell) {
   background: #f1f5f9;
 }
 
-.timeline-table tbody tr:hover .company-cell {
+.timeline-table tbody tr:hover:not(.spacing-row) .company-cell {
   background: #e2e8f0 !important;
 }
 
-.timeline-table tbody tr:hover .data-cell.has-data {
+.timeline-table tbody tr:hover:not(.spacing-row) .data-cell.has-data {
   background: #1d4ed8 !important;
   color: #ffffff !important;
   transform: scale(1.05);
 }
 
-/* Tooltip */
-.tooltip {
-  position: absolute;
-  background: #1a1a1a;
-  color: #ffffff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  z-index: 1000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.tooltip.show {
-  opacity: 1;
+.timeline-table tbody tr:hover:not(.spacing-row) .data-cell.has-data.high-volume {
+  background: #b91c1c !important;
+  transform: scale(1.1);
 }
 
 /* Responsive - Better mobile */
@@ -435,6 +563,15 @@ body {
   .header-left, .header-right {
     width: 100%;
     justify-content: space-between;
+  }
+  
+  .search-filters {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .search-input, .filter-select {
+    min-width: 140px;
   }
   
   .stats {
@@ -472,6 +609,15 @@ body {
     font-size: 20px;
   }
   
+  .search-filters {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .search-input, .filter-select {
+    width: 100%;
+  }
+  
   .stats {
     flex-direction: column;
     gap: 12px;
@@ -502,7 +648,7 @@ body {
 }
 
 /* Focus states */
-button:focus, input:focus {
+button:focus, input:focus, select:focus {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }

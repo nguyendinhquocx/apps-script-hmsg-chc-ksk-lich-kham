@@ -3,7 +3,10 @@
 let currentMonth = new Date().getMonth() + 1;
 let currentYear = new Date().getFullYear();
 let showCompleted = false;
+let searchCompany = '';
+let filterEmployee = '';
 let dashboardData = null;
+let companyColumnWidth = 180; // Default width
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -21,7 +24,20 @@ function initializeApp() {
     navigateMonth(1);
   });
   
-  // Filter checkbox
+  // Search input
+  const searchInput = document.getElementById('companySearch');
+  searchInput.addEventListener('input', debounce((e) => {
+    searchCompany = e.target.value.trim();
+    loadData();
+  }, 300));
+  
+  // Employee filter
+  document.getElementById('employeeFilter').addEventListener('change', (e) => {
+    filterEmployee = e.target.value;
+    loadData();
+  });
+  
+  // Completed filter checkbox
   document.getElementById('showCompleted').addEventListener('change', (e) => {
     showCompleted = e.target.checked;
     loadData();
@@ -32,7 +48,66 @@ function initializeApp() {
     refreshData();
   });
   
+  // Initialize resize functionality
+  initializeColumnResize();
+  
   updateMonthDisplay();
+}
+
+// Debounce function for search
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Column resize functionality
+function initializeColumnResize() {
+  const resizeHandle = document.getElementById('resizeHandle');
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = companyColumnWidth;
+  
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = companyColumnWidth;
+    resizeHandle.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    e.preventDefault();
+  });
+  
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    
+    const deltaX = e.clientX - startX;
+    const newWidth = Math.max(120, Math.min(300, startWidth + deltaX));
+    
+    companyColumnWidth = newWidth;
+    updateCompanyColumnWidth();
+  });
+  
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      resizeHandle.classList.remove('resizing');
+      document.body.style.cursor = '';
+    }
+  });
+}
+
+function updateCompanyColumnWidth() {
+  document.documentElement.style.setProperty('--company-width', companyColumnWidth + 'px');
+  
+  // Update resize handle position
+  const resizeHandle = document.getElementById('resizeHandle');
+  resizeHandle.style.left = companyColumnWidth + 'px';
 }
 
 function navigateMonth(direction) {
@@ -74,14 +149,14 @@ function loadData() {
   google.script.run
     .withSuccessHandler(onDataLoaded)
     .withFailureHandler(onDataError)
-    .getScheduleData(currentMonth, currentYear, showCompleted);
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee);
 }
 
 function refreshData() {
   showLoading();
   
   google.script.run
-    .withSuccessHandler(onDataLoaded)
+    .withSuccessHandler(onRefreshDataLoaded)
     .withFailureHandler(onDataError)
     .refreshCache();
 }
@@ -95,8 +170,22 @@ function onDataLoaded(data) {
   }
   
   dashboardData = data;
+  
+  // Update employee filter options
+  updateEmployeeFilter(data.employees || []);
+  
   renderDashboard(data);
   showDashboard();
+}
+
+function onRefreshDataLoaded(data) {
+  // Reset filters after refresh
+  searchCompany = '';
+  filterEmployee = '';
+  document.getElementById('companySearch').value = '';
+  document.getElementById('employeeFilter').value = '';
+  
+  onDataLoaded(data);
 }
 
 function onDataError(error) {
@@ -105,12 +194,37 @@ function onDataError(error) {
   console.error('Error:', error);
 }
 
+function updateEmployeeFilter(employees) {
+  const select = document.getElementById('employeeFilter');
+  
+  // Keep current selection
+  const currentValue = select.value;
+  
+  // Clear existing options except first
+  select.innerHTML = '<option value="">Tất cả nhân viên</option>';
+  
+  // Add employee options
+  employees.forEach(employee => {
+    const option = document.createElement('option');
+    option.value = employee;
+    option.textContent = employee;
+    select.appendChild(option);
+  });
+  
+  // Restore selection if still valid
+  if (currentValue && employees.includes(currentValue)) {
+    select.value = currentValue;
+  }
+}
+
 function renderDashboard(data) {
   renderStats(data.summary);
   renderTimeline(data.timeline);
+  updateCompanyColumnWidth(); // Apply column width after render
 }
 
 function renderStats(summary) {
+  // Always show all stats regardless of showCompleted filter
   document.getElementById('pendingCompanies').textContent = summary.pendingCompanies || 0;
   document.getElementById('completedCompanies').textContent = summary.completedCompanies || 0;
   document.getElementById('averagePerDay').textContent = summary.averagePerDay || 0;
@@ -149,9 +263,10 @@ function shortenCompanyName(fullName) {
     shortened = shortened.replace(regex, shortcuts[key]);
   });
   
-  // Limit length
-  if (shortened.length > 25) {
-    shortened = shortened.substring(0, 22) + '...';
+  // Dynamic length based on column width
+  const maxLength = Math.floor(companyColumnWidth / 8); // Approximate character width
+  if (shortened.length > maxLength) {
+    shortened = shortened.substring(0, maxLength - 3) + '...';
   }
   
   return shortened;
@@ -172,9 +287,11 @@ function renderTimeline(timeline) {
   }
   
   // Clear existing content
+  const weekdayRow = document.getElementById('weekdayRow');
   const dateRow = document.getElementById('dateRow');
   const tbody = document.getElementById('timelineBody');
   
+  weekdayRow.innerHTML = '<th class="company-header"></th>';
   dateRow.innerHTML = '<th class="company-header">Công ty</th>';
   tbody.innerHTML = '';
   
@@ -182,36 +299,66 @@ function renderTimeline(timeline) {
   const isCurrentMonth = (currentMonth === today.getMonth() + 1) && (currentYear === today.getFullYear());
   const todayDate = today.getDate();
   
-  // Create date headers (no weekdays)
+  // Create weekday and date headers
   timeline.dates.forEach((date, index) => {
+    const weekday = timeline.weekdays[index];
+    
+    // Weekday header
+    const weekdayTh = document.createElement('th');
+    weekdayTh.textContent = weekday;
+    weekdayTh.classList.add('weekday-header');
+    
+    // Date header
     const dateTh = document.createElement('th');
     dateTh.textContent = date;
     dateTh.classList.add('date-header');
     
     // Mark weekends
-    const fullDate = new Date(currentYear, currentMonth - 1, date);
-    const dayOfWeek = fullDate.getDay();
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
+    if (weekday === 'CN' || weekday === 'T7') {
+      weekdayTh.classList.add('weekend');
       dateTh.classList.add('weekend');
     }
     
     // Mark today
     if (isCurrentMonth && date === todayDate) {
+      weekdayTh.classList.add('today');
       dateTh.classList.add('today');
     }
     
+    weekdayRow.appendChild(weekdayTh);
     dateRow.appendChild(dateTh);
   });
+  
+  // Add total column headers
+  const weekdayTotal = document.createElement('th');
+  weekdayTotal.textContent = '';
+  weekdayTotal.classList.add('total-header');
+  weekdayRow.appendChild(weekdayTotal);
+  
+  const dateTotal = document.createElement('th');
+  dateTotal.textContent = 'Người';
+  dateTotal.classList.add('total-header');
+  dateRow.appendChild(dateTotal);
   
   // Create data rows
   timeline.rows.forEach(row => {
     const tr = document.createElement('tr');
     
+    // Handle spacing row
+    if (row.isSpacing) {
+      tr.classList.add('spacing-row');
+      const spacingCell = document.createElement('td');
+      spacingCell.colSpan = timeline.dates.length + 2; // +2 for company and total columns
+      tr.appendChild(spacingCell);
+      tbody.appendChild(tr);
+      return;
+    }
+    
     if (row.company === 'TỔNG') {
       tr.classList.add('total-row');
     }
     
-    // Company name cell with shortened name
+    // Company name cell
     const companyCell = document.createElement('td');
     companyCell.classList.add('company-cell');
     
@@ -221,7 +368,7 @@ function renderTimeline(timeline) {
     
     tr.appendChild(companyCell);
     
-    // Data cells with tooltips
+    // Data cells
     row.data.forEach((value, dayIndex) => {
       const td = document.createElement('td');
       td.classList.add('data-cell');
@@ -230,8 +377,8 @@ function renderTimeline(timeline) {
         td.textContent = value;
         td.classList.add('has-data');
         
-        // Highlight high volume (>10 people)
-        if (value > 10) {
+        // Highlight high volume (>50 people)
+        if (value > 50) {
           td.classList.add('high-volume');
         }
         
@@ -239,15 +386,17 @@ function renderTimeline(timeline) {
         const tooltipText = createTooltip(row.company, timeline.dates[dayIndex], value);
         td.title = tooltipText;
         
+      } else if (value === '') {
+        td.textContent = '';
+        // No classes for spacing cells
       } else {
         td.textContent = '';
         td.classList.add('empty');
       }
       
       // Mark weekends
-      const fullDate = new Date(currentYear, currentMonth - 1, timeline.dates[dayIndex]);
-      const dayOfWeek = fullDate.getDay();
-      if (dayOfWeek === 0 || dayOfWeek === 6) {
+      const weekday = timeline.weekdays[dayIndex];
+      if (weekday === 'CN' || weekday === 'T7') {
         td.classList.add('weekend');
       }
       
@@ -258,6 +407,18 @@ function renderTimeline(timeline) {
       
       tr.appendChild(td);
     });
+    
+    // Total cell
+    const totalCell = document.createElement('td');
+    totalCell.classList.add('total-cell');
+    if (row.total > 0) {
+      totalCell.textContent = row.total;
+    } else if (row.total === '') {
+      totalCell.textContent = '';
+    } else {
+      totalCell.textContent = '0';
+    }
+    tr.appendChild(totalCell);
     
     tbody.appendChild(tr);
   });
@@ -304,6 +465,10 @@ document.addEventListener('keydown', (e) => {
       case 'f':
         e.preventDefault();
         document.getElementById('showCompleted').click();
+        break;
+      case 'k':
+        e.preventDefault();
+        document.getElementById('companySearch').focus();
         break;
     }
   }

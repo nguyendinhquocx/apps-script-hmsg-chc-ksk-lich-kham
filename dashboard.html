@@ -21,12 +21,22 @@
       </div>
       
       <div class="header-right">
-        <div class="filter-group">
-          <label class="filter-label">
-            <input type="checkbox" id="showCompleted" class="filter-checkbox">
-            <span class="filter-text">Hiện đã khám xong</span>
-          </label>
+        <!-- Search và Filters -->
+        <div class="search-filters">
+          <input type="text" id="companySearch" class="search-input" placeholder="Tìm công ty...">
+          
+          <select id="employeeFilter" class="filter-select">
+            <option value="">Tất cả nhân viên</option>
+          </select>
+          
+          <div class="filter-group">
+            <label class="filter-label">
+              <input type="checkbox" id="showCompleted" class="filter-checkbox">
+              <span class="filter-text">Hiện đã khám xong</span>
+            </label>
+          </div>
         </div>
+        
         <button id="refreshBtn" class="update-btn" title="Cập nhật">↻</button>
       </div>
     </div>
@@ -66,13 +76,20 @@
       <!-- Timeline -->
       <div class="timeline-wrapper">
         <div class="timeline-container">
+          <!-- Resize handle -->
+          <div id="resizeHandle" class="resize-handle"></div>
+          
           <table id="timelineTable" class="timeline-table">
             <thead>
               <tr id="weekdayRow" class="weekday-row">
                 <th class="company-header"></th>
+                <!-- weekdays will be inserted here -->
+                <th class="total-header">Tổng</th>
               </tr>
               <tr id="dateRow" class="date-row">
                 <th class="company-header">Công ty</th>
+                <!-- dates will be inserted here -->
+                <th class="total-header">Người</th>
               </tr>
             </thead>
             <tbody id="timelineBody">
