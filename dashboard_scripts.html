@@ -5,8 +5,15 @@ let currentYear = new Date().getFullYear();
 let showCompleted = false;
 let searchCompany = '';
 let filterEmployee = '';
+let dateRangeFilter = null; // { start: Date, end: Date }
 let dashboardData = null;
-let companyColumnWidth = 180; // Default width
+let employeeColumnWidth = 100;
+let companyColumnWidth = 200;
+
+// Calendar state
+let calendarMonth = new Date().getMonth() + 1;
+let calendarYear = new Date().getFullYear();
+let selectedDateRange = { start: null, end: null };
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -31,6 +38,9 @@ function initializeApp() {
     loadData();
   }, 300));
   
+  // Date range picker
+  initializeDatePicker();
+  
   // Employee filter
   document.getElementById('employeeFilter').addEventListener('change', (e) => {
     filterEmployee = e.target.value;
@@ -54,7 +64,172 @@ function initializeApp() {
   updateMonthDisplay();
 }
 
-// Debounce function for search
+// Date Range Picker
+function initializeDatePicker() {
+  const dateInput = document.getElementById('dateRangeInput');
+  const dropdown = document.getElementById('dateRangeDropdown');
+  
+  dateInput.addEventListener('click', () => {
+    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+    if (dropdown.style.display === 'block') {
+      renderCalendar();
+    }
+  });
+  
+  // Calendar navigation
+  document.getElementById('prevCalendarMonth').addEventListener('click', () => {
+    navigateCalendar(-1);
+  });
+  
+  document.getElementById('nextCalendarMonth').addEventListener('click', () => {
+    navigateCalendar(1);
+  });
+  
+  // Actions
+  document.getElementById('clearDateRange').addEventListener('click', () => {
+    selectedDateRange = { start: null, end: null };
+    dateRangeFilter = null;
+    dateInput.value = '';
+    dropdown.style.display = 'none';
+    loadData();
+  });
+  
+  document.getElementById('applyDateRange').addEventListener('click', () => {
+    if (selectedDateRange.start) {
+      dateRangeFilter = {
+        start: selectedDateRange.start,
+        end: selectedDateRange.end || selectedDateRange.start
+      };
+      
+      const startStr = formatDate(dateRangeFilter.start);
+      const endStr = dateRangeFilter.end && dateRangeFilter.end !== dateRangeFilter.start 
+        ? formatDate(dateRangeFilter.end) : '';
+      
+      dateInput.value = endStr ? `${startStr} - ${endStr}` : startStr;
+      dropdown.style.display = 'none';
+      loadData();
+    }
+  });
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.date-picker-container')) {
+      dropdown.style.display = 'none';
+    }
+  });
+}
+
+function navigateCalendar(direction) {
+  calendarMonth += direction;
+  
+  if (calendarMonth > 12) {
+    calendarMonth = 1;
+    calendarYear++;
+  } else if (calendarMonth < 1) {
+    calendarMonth = 12;
+    calendarYear--;
+  }
+  
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const monthNames = [
+    '', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+  ];
+  
+  document.getElementById('calendarMonthDisplay').textContent = 
+    `${monthNames[calendarMonth]} ${calendarYear}`;
+  
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '';
+  
+  // Weekday headers
+  const weekdays = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  weekdays.forEach(day => {
+    const dayHeader = document.createElement('div');
+    dayHeader.textContent = day;
+    dayHeader.style.fontWeight = '600';
+    dayHeader.style.fontSize = '12px';
+    dayHeader.style.color = '#64748b';
+    dayHeader.style.textAlign = 'center';
+    dayHeader.style.padding = '8px 0';
+    grid.appendChild(dayHeader);
+  });
+  
+  // Calendar days
+  const firstDay = new Date(calendarYear, calendarMonth - 1, 1);
+  const lastDay = new Date(calendarYear, calendarMonth, 0);
+  const startDate = new Date(firstDay);
+  startDate.setDate(startDate.getDate() - firstDay.getDay());
+  
+  for (let i = 0; i < 42; i++) {
+    const currentDate = new Date(startDate);
+    currentDate.setDate(startDate.getDate() + i);
+    
+    const dayEl = document.createElement('div');
+    dayEl.className = 'calendar-day';
+    dayEl.textContent = currentDate.getDate();
+    
+    if (currentDate.getMonth() !== calendarMonth - 1) {
+      dayEl.classList.add('disabled');
+    } else {
+      dayEl.addEventListener('click', () => selectDate(new Date(currentDate)));
+      
+      // Check if selected
+      if (isDateSelected(currentDate)) {
+        dayEl.classList.add('selected');
+      }
+      
+      // Check if in range
+      if (isDateInRange(currentDate)) {
+        dayEl.classList.add('in-range');
+      }
+    }
+    
+    grid.appendChild(dayEl);
+  }
+}
+
+function selectDate(date) {
+  if (!selectedDateRange.start || (selectedDateRange.start && selectedDateRange.end)) {
+    // Start new selection
+    selectedDateRange = { start: new Date(date), end: null };
+  } else {
+    // Complete range
+    const start = selectedDateRange.start;
+    selectedDateRange.end = date < start ? new Date(date) : new Date(date);
+    if (date < start) {
+      selectedDateRange.start = new Date(date);
+      selectedDateRange.end = start;
+    }
+  }
+  
+  renderCalendar();
+}
+
+function isDateSelected(date) {
+  return (selectedDateRange.start && isSameDate(date, selectedDateRange.start)) ||
+         (selectedDateRange.end && isSameDate(date, selectedDateRange.end));
+}
+
+function isDateInRange(date) {
+  if (!selectedDateRange.start || !selectedDateRange.end) return false;
+  return date >= selectedDateRange.start && date <= selectedDateRange.end;
+}
+
+function isSameDate(date1, date2) {
+  return date1.getFullYear() === date2.getFullYear() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getDate() === date2.getDate();
+}
+
+function formatDate(date) {
+  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+}
+
+// Debounce function
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -69,16 +244,25 @@ function debounce(func, wait) {
 
 // Column resize functionality
 function initializeColumnResize() {
-  const resizeHandle = document.getElementById('resizeHandle');
+  const employeeHandle = document.getElementById('employeeResizeHandle');
+  const companyHandle = document.getElementById('companyResizeHandle');
+  
+  initializeResize(employeeHandle, 'employee');
+  initializeResize(companyHandle, 'company');
+  
+  updateColumnWidths();
+}
+
+function initializeResize(handle, type) {
   let isResizing = false;
   let startX = 0;
-  let startWidth = companyColumnWidth;
+  let startWidth = type === 'employee' ? employeeColumnWidth : companyColumnWidth;
   
-  resizeHandle.addEventListener('mousedown', (e) => {
+  handle.addEventListener('mousedown', (e) => {
     isResizing = true;
     startX = e.clientX;
-    startWidth = companyColumnWidth;
-    resizeHandle.classList.add('resizing');
+    startWidth = type === 'employee' ? employeeColumnWidth : companyColumnWidth;
+    handle.classList.add('resizing');
     document.body.style.cursor = 'col-resize';
     e.preventDefault();
   });
@@ -87,27 +271,35 @@ function initializeColumnResize() {
     if (!isResizing) return;
     
     const deltaX = e.clientX - startX;
-    const newWidth = Math.max(120, Math.min(300, startWidth + deltaX));
+    const minWidth = type === 'employee' ? 80 : 150;
+    const maxWidth = type === 'employee' ? 150 : 350;
+    const newWidth = Math.max(minWidth, Math.min(maxWidth, startWidth + deltaX));
     
-    companyColumnWidth = newWidth;
-    updateCompanyColumnWidth();
+    if (type === 'employee') {
+      employeeColumnWidth = newWidth;
+    } else {
+      companyColumnWidth = newWidth;
+    }
+    
+    updateColumnWidths();
   });
   
   document.addEventListener('mouseup', () => {
     if (isResizing) {
       isResizing = false;
-      resizeHandle.classList.remove('resizing');
+      handle.classList.remove('resizing');
       document.body.style.cursor = '';
     }
   });
 }
 
-function updateCompanyColumnWidth() {
+function updateColumnWidths() {
+  document.documentElement.style.setProperty('--employee-width', employeeColumnWidth + 'px');
   document.documentElement.style.setProperty('--company-width', companyColumnWidth + 'px');
   
-  // Update resize handle position
-  const resizeHandle = document.getElementById('resizeHandle');
-  resizeHandle.style.left = companyColumnWidth + 'px';
+  // Update resize handle positions
+  document.getElementById('employeeResizeHandle').style.left = employeeColumnWidth + 'px';
+  document.getElementById('companyResizeHandle').style.left = (employeeColumnWidth + companyColumnWidth) + 'px';
 }
 
 function navigateMonth(direction) {
@@ -139,6 +331,8 @@ function loadCurrentMonth() {
   const now = new Date();
   currentMonth = now.getMonth() + 1;
   currentYear = now.getFullYear();
+  calendarMonth = currentMonth;
+  calendarYear = currentYear;
   updateMonthDisplay();
   loadData();
 }
@@ -149,7 +343,7 @@ function loadData() {
   google.script.run
     .withSuccessHandler(onDataLoaded)
     .withFailureHandler(onDataError)
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee);
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, dateRangeFilter);
 }
 
 function refreshData() {
@@ -182,8 +376,11 @@ function onRefreshDataLoaded(data) {
   // Reset filters after refresh
   searchCompany = '';
   filterEmployee = '';
+  dateRangeFilter = null;
+  selectedDateRange = { start: null, end: null };
   document.getElementById('companySearch').value = '';
   document.getElementById('employeeFilter').value = '';
+  document.getElementById('dateRangeInput').value = '';
   
   onDataLoaded(data);
 }
@@ -220,18 +417,33 @@ function updateEmployeeFilter(employees) {
 function renderDashboard(data) {
   renderStats(data.summary);
   renderTimeline(data.timeline);
-  updateCompanyColumnWidth(); // Apply column width after render
+  updateColumnWidths();
 }
 
+// Enhanced stats with number formatting
 function renderStats(summary) {
-  // Always show all stats regardless of showCompleted filter
-  document.getElementById('pendingCompanies').textContent = summary.pendingCompanies || 0;
-  document.getElementById('completedCompanies').textContent = summary.completedCompanies || 0;
-  document.getElementById('averagePerDay').textContent = summary.averagePerDay || 0;
+  document.getElementById('completedCompanies').textContent = formatNumber(summary.completedCompanies || 0);
+  document.getElementById('pendingCompanies').textContent = formatNumber(summary.pendingCompanies || 0);
+  document.getElementById('remainingCompanies').textContent = formatNumber(summary.remainingCompanies || 0);
+  document.getElementById('totalPeople').textContent = formatNumber(summary.totalPeople || 0);
+  document.getElementById('averagePerDay').textContent = formatNumber(summary.averagePerDay || 0);
+}
+
+function formatNumber(num) {
+  return new Intl.NumberFormat('vi-VN').format(num);
 }
 
 /**
- * Rút gọn tên công ty - Improved
+ * Extract first name from full name
+ */
+function extractFirstName(fullName) {
+  if (!fullName) return '';
+  const parts = fullName.trim().split(' ');
+  return parts[parts.length - 1]; // Last part is usually the first name in Vietnamese
+}
+
+/**
+ * Enhanced company name shortening
  */
 function shortenCompanyName(fullName) {
   const shortcuts = {
@@ -264,7 +476,7 @@ function shortenCompanyName(fullName) {
   });
   
   // Dynamic length based on column width
-  const maxLength = Math.floor(companyColumnWidth / 8); // Approximate character width
+  const maxLength = Math.floor(companyColumnWidth / 9); // Adjusted character width
   if (shortened.length > maxLength) {
     shortened = shortened.substring(0, maxLength - 3) + '...';
   }
@@ -272,9 +484,6 @@ function shortenCompanyName(fullName) {
   return shortened;
 }
 
-/**
- * Create tooltip content
- */
 function createTooltip(companyName, date, peopleCount) {
   return `${companyName}\nNgày ${date}: ${peopleCount} người khám`;
 }
@@ -291,8 +500,17 @@ function renderTimeline(timeline) {
   const dateRow = document.getElementById('dateRow');
   const tbody = document.getElementById('timelineBody');
   
-  weekdayRow.innerHTML = '<th class="company-header"></th>';
-  dateRow.innerHTML = '<th class="company-header">Công ty</th>';
+  // Reset headers - keep fixed columns
+  weekdayRow.innerHTML = `
+    <th class="employee-header"></th>
+    <th class="company-header"></th>
+    <th class="people-header"></th>
+  `;
+  dateRow.innerHTML = `
+    <th class="employee-header">Nhân viên</th>
+    <th class="company-header">Công ty</th>
+    <th class="people-header">Người</th>
+  `;
   tbody.innerHTML = '';
   
   const today = new Date();
@@ -329,17 +547,6 @@ function renderTimeline(timeline) {
     dateRow.appendChild(dateTh);
   });
   
-  // Add total column headers
-  const weekdayTotal = document.createElement('th');
-  weekdayTotal.textContent = '';
-  weekdayTotal.classList.add('total-header');
-  weekdayRow.appendChild(weekdayTotal);
-  
-  const dateTotal = document.createElement('th');
-  dateTotal.textContent = 'Người';
-  dateTotal.classList.add('total-header');
-  dateRow.appendChild(dateTotal);
-  
   // Create data rows
   timeline.rows.forEach(row => {
     const tr = document.createElement('tr');
@@ -348,7 +555,7 @@ function renderTimeline(timeline) {
     if (row.isSpacing) {
       tr.classList.add('spacing-row');
       const spacingCell = document.createElement('td');
-      spacingCell.colSpan = timeline.dates.length + 2; // +2 for company and total columns
+      spacingCell.colSpan = timeline.dates.length + 3; // +3 for employee, company, people columns
       tr.appendChild(spacingCell);
       tbody.appendChild(tr);
       return;
@@ -358,15 +565,33 @@ function renderTimeline(timeline) {
       tr.classList.add('total-row');
     }
     
+    // Employee name cell
+    const employeeCell = document.createElement('td');
+    employeeCell.classList.add('employee-cell');
+    const employeeName = row.employee ? extractFirstName(row.employee) : '';
+    employeeCell.textContent = employeeName;
+    employeeCell.title = row.employee || ''; // Full name on hover
+    tr.appendChild(employeeCell);
+    
     // Company name cell
     const companyCell = document.createElement('td');
     companyCell.classList.add('company-cell');
-    
     const displayName = row.company === 'TỔNG' ? 'TỔNG' : shortenCompanyName(row.company);
     companyCell.textContent = displayName;
     companyCell.title = row.company; // Full name on hover
-    
     tr.appendChild(companyCell);
+    
+    // People count cell
+    const peopleCell = document.createElement('td');
+    peopleCell.classList.add('people-cell');
+    if (row.total > 0) {
+      peopleCell.textContent = formatNumber(row.total);
+    } else if (row.total === '') {
+      peopleCell.textContent = '';
+    } else {
+      peopleCell.textContent = '0';
+    }
+    tr.appendChild(peopleCell);
     
     // Data cells
     row.data.forEach((value, dayIndex) => {
@@ -377,8 +602,8 @@ function renderTimeline(timeline) {
         td.textContent = value;
         td.classList.add('has-data');
         
-        // Highlight high volume (>50 people)
-        if (value > 50) {
+        // Highlight high volume (>100 people)
+        if (value > 100) {
           td.classList.add('high-volume');
         }
         
@@ -407,18 +632,6 @@ function renderTimeline(timeline) {
       
       tr.appendChild(td);
     });
-    
-    // Total cell
-    const totalCell = document.createElement('td');
-    totalCell.classList.add('total-cell');
-    if (row.total > 0) {
-      totalCell.textContent = row.total;
-    } else if (row.total === '') {
-      totalCell.textContent = '';
-    } else {
-      totalCell.textContent = '0';
-    }
-    tr.appendChild(totalCell);
     
     tbody.appendChild(tr);
   });
@@ -469,6 +682,10 @@ document.addEventListener('keydown', (e) => {
       case 'k':
         e.preventDefault();
         document.getElementById('companySearch').focus();
+        break;
+      case 'd':
+        e.preventDefault();
+        document.getElementById('dateRangeInput').click();
         break;
     }
   }
