@@ -1,5 +1,5 @@
 <style>
-/* Reset & Base */
+/* Reset & Base - Enhanced */
 * {
   margin: 0;
   padding: 0;
@@ -22,7 +22,7 @@ body {
   min-height: 100vh;
 }
 
-/* Header */
+/* Header - Enhanced */
 .header {
   display: flex;
   justify-content: space-between;
@@ -83,7 +83,7 @@ body {
   color: #1a1a1a;
 }
 
-/* Header Right */
+/* Header Right với Search & Filters */
 .header-right {
   display: flex;
   align-items: center;
@@ -96,7 +96,7 @@ body {
   gap: 12px;
 }
 
-/* Search Input */
+/* Search Input & Date Picker */
 .search-input {
   padding: 8px 12px;
   border: 1px solid #d1d5db;
@@ -116,6 +116,110 @@ body {
 
 .search-input::placeholder {
   color: #94a3b8;
+}
+
+/* Date Range Picker */
+.date-picker-container {
+  position: relative;
+}
+
+.date-picker-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  z-index: 1000;
+  min-width: 280px;
+  display: none;
+}
+
+.date-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.calendar-nav {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.calendar-nav:hover {
+  background: #f1f5f9;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.calendar-day {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.calendar-day:hover {
+  background: #f1f5f9;
+}
+
+.calendar-day.selected {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.calendar-day.in-range {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.calendar-day.disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.date-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.date-action-btn {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.date-action-btn.clear {
+  background: #ffffff;
+  color: #64748b;
+}
+
+.date-action-btn.apply {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
 }
 
 /* Filter Select */
@@ -280,7 +384,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* Timeline - Clean White Design */
+/* Timeline - Borderless Clean Design */
 .timeline-wrapper {
   background: #ffffff;
   border-radius: 16px;
@@ -302,7 +406,37 @@ body {
   min-width: 900px;
 }
 
-/* Table Headers - Today highlight chỉ ở header */
+/* Resize Handles */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 20;
+  border-right: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.employee-resize {
+  left: var(--employee-width, 100px);
+}
+
+.company-resize {
+  left: calc(var(--employee-width, 100px) + var(--company-width, 200px));
+}
+
+.resize-handle:hover {
+  border-right-color: #2563eb;
+}
+
+.resize-handle.resizing {
+  border-right-color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+}
+
+/* Table Headers */
 .weekday-row th {
   padding: 8px 6px;
   text-align: center;
@@ -314,12 +448,6 @@ body {
   top: 0;
   z-index: 10;
   border: none;
-}
-
-.weekday-row th.today {
-  background: #fbf8cc !important;
-  color: #1a1a1a;
-  font-weight: 600;
 }
 
 .date-row th {
@@ -335,20 +463,26 @@ body {
   border: none;
 }
 
-.date-row th.today {
-  background: #fbf8cc !important;
-  color: #1a1a1a;
-  font-weight: 700;
-}
-
-/* Column Headers - Cố định không resize */
-.company-header {
+/* Column Headers */
+.employee-header {
   text-align: left !important;
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
+  width: var(--employee-width, 100px);
+  min-width: 80px;
+  max-width: 150px;
   position: sticky;
   left: 0;
+  background: #ffffff !important;
+  z-index: 11;
+  border: none !important;
+}
+
+.company-header {
+  text-align: left !important;
+  width: var(--company-width, 200px);
+  min-width: 150px;
+  max-width: 350px;
+  position: sticky;
+  left: var(--employee-width, 100px);
   background: #ffffff !important;
   z-index: 11;
   border: none !important;
@@ -359,7 +493,7 @@ body {
   width: 80px;
   min-width: 80px;
   position: sticky;
-  left: 300px;
+  left: calc(var(--employee-width, 100px) + var(--company-width, 200px));
   background: #ffffff !important;
   z-index: 11;
   color: #2563eb !important;
@@ -369,26 +503,43 @@ body {
 
 /* Table Body - Borderless */
 .timeline-table td {
-  padding: 6px;
+  padding: 8px 6px;
   text-align: center;
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
   border: none;
-  background: #ffffff;
 }
 
-/* Company cells - Cố định */
-.company-cell {
+/* Employee cells */
+.employee-cell {
   text-align: left !important;
   font-weight: 500 !important;
   background: #ffffff;
   position: sticky;
   left: 0;
   z-index: 5;
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
+  width: var(--employee-width, 100px);
+  min-width: 80px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  padding: 8px 12px;
+  color: #64748b;
+}
+
+/* Company cells */
+.company-cell {
+  text-align: left !important;
+  font-weight: 500 !important;
+  background: #ffffff;
+  position: sticky;
+  left: var(--employee-width, 100px);
+  z-index: 5;
+  width: var(--company-width, 200px);
+  min-width: 150px;
+  max-width: 350px;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
@@ -402,52 +553,66 @@ body {
   font-weight: 600 !important;
   color: #2563eb !important;
   position: sticky;
-  left: 300px;
+  left: calc(var(--employee-width, 100px) + var(--company-width, 200px));
   z-index: 5;
   width: 80px;
   min-width: 80px;
 }
 
-/* Data cells - Rounded với spacing */
+/* Data cells - New clean design */
 .data-cell {
   position: relative;
-  padding: 4px;
-}
-
-.data-cell-inner {
-  min-width: 36px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   font-size: 14px;
   font-weight: 600;
   border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
+  margin: 2px;
 }
 
-.data-cell.has-data .data-cell-inner {
+.data-cell.has-data {
   background: #b9fbc0;
   color: #166534;
 }
 
-.data-cell.has-data.high-volume .data-cell-inner {
+.data-cell.has-data.high-volume {
   background: #ffcfd2 !important;
   color: #dc2626;
   font-weight: 800;
-  box-shadow: 0 0 8px rgba(255, 207, 210, 0.4);
+  box-shadow: 0 0 8px rgba(255, 207, 210, 0.6);
+  animation: gentle-pulse 3s infinite;
 }
 
-.data-cell.empty .data-cell-inner {
-  background: transparent;
+@keyframes gentle-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.data-cell.empty {
+  background: #ffffff;
   color: #cbd5e1;
+}
+
+.data-cell.today {
+  border: 2px solid #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24;
 }
 
 /* Weekend styling */
 .weekend {
   background: #ffffff !important;
+}
+
+.timeline-table td.weekend.has-data {
+  background: #b9fbc0 !important;
+  color: #166534 !important;
+}
+
+.timeline-table td.weekend.has-data.high-volume {
+  background: #ffcfd2 !important;
+  color: #dc2626 !important;
 }
 
 /* Spacing row */
@@ -456,72 +621,64 @@ body {
 }
 
 .spacing-row td {
-  background: #ffffff;
+  background: transparent;
   border: none;
   padding: 0;
 }
 
-/* Total row - Đường kẻ ngang đen */
+/* Total row */
 .total-row {
-  border-top: 2px solid #000000 !important;
+  border-top: 2px solid #2563eb;
+  background: #ffffff;
 }
 
 .total-row td {
   background: #ffffff;
   font-weight: 700;
-  border-top: 2px solid #000000 !important;
+}
+
+.total-row .employee-cell {
+  background: #ffffff !important;
+  font-weight: 600 !important;
+  color: #2563eb !important;
 }
 
 .total-row .company-cell {
   background: #ffffff !important;
   font-weight: 700 !important;
-  color: #1a1a1a !important;
+  color: #2563eb !important;
   font-size: 14px !important;
-  border-top: 2px solid #000000 !important;
 }
 
 .total-row .people-cell {
-  background: #ffffff !important;
-  color: #2563eb !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
   font-size: 16px !important;
-  font-weight: 800 !important;
-  border-top: 2px solid #000000 !important;
 }
 
-.total-row .data-cell {
-  border-top: 2px solid #000000 !important;
-}
-
-.total-row .data-cell.has-data .data-cell-inner {
+.total-row .data-cell.has-data {
   background: #b9fbc0;
   color: #166534;
-  font-weight: 700;
 }
 
-.total-row .data-cell.has-data.high-volume .data-cell-inner {
+.total-row .data-cell.has-data.high-volume {
   background: #ffcfd2 !important;
   color: #dc2626;
-  font-weight: 800;
 }
 
 /* Hover effects */
 .timeline-table tbody tr:hover:not(.spacing-row) {
-  background: rgba(37, 99, 235, 0.01);
+  background: rgba(37, 99, 235, 0.02);
 }
 
-.timeline-table tbody tr:hover:not(.spacing-row) .data-cell.has-data .data-cell-inner {
-  transform: scale(1.1);
+.timeline-table tbody tr:hover:not(.spacing-row) .data-cell.has-data {
+  transform: scale(1.05);
   box-shadow: 0 2px 8px rgba(185, 251, 192, 0.4);
 }
 
-.timeline-table tbody tr:hover:not(.spacing-row) .data-cell.has-data.high-volume .data-cell-inner {
-  transform: scale(1.15);
+.timeline-table tbody tr:hover:not(.spacing-row) .data-cell.has-data.high-volume {
+  transform: scale(1.08);
   box-shadow: 0 2px 8px rgba(255, 207, 210, 0.6);
-}
-
-/* Hidden rows for completed companies */
-.timeline-table tbody tr.hidden {
-  display: none;
 }
 
 /* Responsive */
@@ -559,18 +716,6 @@ body {
     min-width: 150px;
     padding: 16px;
   }
-  
-  .company-header,
-  .company-cell {
-    width: 250px;
-    min-width: 250px;
-    max-width: 250px;
-  }
-  
-  .people-header,
-  .people-cell {
-    left: 250px;
-  }
 }
 
 @media (max-width: 768px) {
@@ -604,19 +749,7 @@ body {
     font-size: 24px;
   }
   
-  .company-header,
-  .company-cell {
-    width: 200px;
-    min-width: 200px;
-    max-width: 200px;
-  }
-  
-  .people-header,
-  .people-cell {
-    left: 200px;
-  }
-  
-  .data-cell-inner {
+  .data-cell {
     min-width: 32px;
     width: 32px;
     height: 32px;
