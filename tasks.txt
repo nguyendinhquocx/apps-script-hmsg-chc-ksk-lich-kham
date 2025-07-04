@@ -2,7 +2,11 @@
 
 ## Tính năng mới cần thêm:
 
-### 1. Tính năng mở rộng thông tin công ty
+### 1. Tính năng mở ### 14. Thêm thông tin 'Tổng số ngày khám' trong modal
+- [x] Cập nhật modal popup khi click vào công ty  
+- [x] Thêm field "Tổng số ngày khám:" dưới "Tổng số người khám:"
+- [x] Tính toán và hiển thị số ngày khám của công ty từ companyDetails
+- [x] Test hiển thị với nhiều công ty khác nhauthông tin công ty
 - [x] Thêm tính năng click vào tên công ty để xổ ra thông tin chi tiết
 - [x] Hiển thị số nhân viên sáng (từ cột 'trung binh ngay sang')
 - [x] Hiển thị số nhân viên chiều (từ cột 'trung binh ngay chieu')
@@ -99,3 +103,38 @@
 - Chưa bắt đầu: 0
 
 ## ✅ TẤT CẢ TASKS PHASE 3 ĐÃ HOÀN THÀNH!
+
+## 🔄 TASKS BỔ SUNG MỚI - Phase 4:
+
+### 13. Fix bộ lọc ca khám (Tổng/Sáng/Chiều) không cập nhật dữ liệu
+- [x] Kiểm tra và sửa logic filter ca khám không hoạt động đúng
+- [x] Đảm bảo khi chọn Sáng hoặc Chiều, dữ liệu bảng timeline cập nhật theo số lượng mới
+- [x] Kiểm tra shiftFilter logic trong processScheduleData()
+- [x] Test filter với dữ liệu thực tế
+
+### 14. Thêm thông tin 'Tổng số ngày khám' trong modal
+- [ ] Cập nhật modal popup khi click vào công ty
+- [ ] Thêm field "Tổng số ngày khám:" dưới "Tổng số người khám:"
+- [ ] Tính toán và hiển thị số ngày khám của công ty từ companyDetails
+- [ ] Test hiển thị với nhiều công ty khác nhau
+
+### 15. Fix logic tính toán số lượng khám sáng/chiều sai dữ liệu
+- [x] Kiểm tra logic đọc dữ liệu từ Google Sheet cho sáng/chiều
+- [x] So sánh với dữ liệu thực tế (ví dụ: sheet có sáng 3, chiều 3 nhưng app hiển thị sáng 2, chiều 2)
+- [x] Sửa logic tính toán trong processScheduleData để đúng với dữ liệu gốc
+- [x] Test với công ty SAVIMEX và các công ty khác
+
+### 16. Cập nhật logic phụ thuộc giữa các bộ lọc
+- [x] Đảm bảo filter công ty, nhân viên và ca khám hoạt động độc lập
+- [x] Cập nhật logic để các filter có thể kết hợp với nhau mà không xung đột
+- [x] Test tất cả combination của filters (company + employee + shift)
+- [x] Đảm bảo cache key bao gồm tất cả filter parameters
+
+---
+## Progress Tracking Phase 4:
+- Tổng tasks mới: 4
+- Hoàn thành: 4
+- Đang thực hiện: 0
+- Chưa bắt đầu: 0
+
+## ✅ TẤT CẢ TASKS PHASE 4 ĐÃ HOÀN THÀNH!

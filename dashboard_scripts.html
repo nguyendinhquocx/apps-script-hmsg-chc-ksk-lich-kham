@@ -43,6 +43,7 @@ function initializeApp() {
   // Shift filter - immediate response
   document.getElementById('shiftFilter').addEventListener('change', (e) => {
     shiftFilter = e.target.value;
+    console.log('Đã chọn shift filter: ' + shiftFilter);
     applyFilters();
   });
   

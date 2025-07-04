@@ -242,10 +242,13 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     }
     
     // Lấy giá trị thực tế từ Google Sheet thay vì tính toán
-    companyDetails[companyName].sang = sang;
-    companyDetails[companyName].chieu = chieu;
-    companyDetails[companyName].tongNguoi = soNguoiKham;
+    // Fix bug: Cần cộng dồn số người khám sáng/chiều nếu có nhiều record cho cùng một công ty
+    companyDetails[companyName].sang += sang;
+    companyDetails[companyName].chieu += chieu;
+    companyDetails[companyName].tongNguoi += soNguoiKham;
     companyDetails[companyName].tongSoNgay += tongSoNgayKham; // Cộng dồn số ngày khám
+    
+    console.log(`Cập nhật công ty ${companyName}: Sáng=${sang}, Tổng sáng=${companyDetails[companyName].sang}, Chiều=${chieu}, Tổng chiều=${companyDetails[companyName].chieu}`)
     
     // Cập nhật nhân viên nếu chưa có
     if (!companyDetails[companyName].employee && record.tenNhanVien) {
@@ -271,16 +274,19 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     
     // Tính số người khám dựa trên shift filter
     let actualPeoplePerDay = 0;
-    if (shiftFilter === 'morning') {
+    if (shiftFilter === 'morning' || shiftFilter === 'sang') {
       actualPeoplePerDay = Math.ceil(sang / actualWorkingDays);
       remainingPeople = sang;
-    } else if (shiftFilter === 'afternoon') {
+      console.log('Chọn ca sáng, số người: ' + sang);
+    } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
       actualPeoplePerDay = Math.ceil(chieu / actualWorkingDays);
       remainingPeople = chieu;
+      console.log('Chọn ca chiều, số người: ' + chieu);
     } else {
       // Mặc định là 'total' - lấy tổng số người khám
       actualPeoplePerDay = Math.ceil(soNguoiKham / actualWorkingDays);
       remainingPeople = soNguoiKham;
+      console.log('Chọn tổng, số người: ' + soNguoiKham);
     }
     
     workingDays.slice(0, actualWorkingDays).forEach(workDate => {
