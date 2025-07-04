@@ -67,3 +67,35 @@
 - Chưa bắt đầu: 0
 
 ## ✅ TẤT CẢ TASKS PHASE 2 ĐÃ HOÀN THÀNH!
+
+## 🔄 TASKS BỔ SUNG MỚI - Phase 3:
+
+### 9. Fix bộ lọc ca khám (Tổng/Sáng/Chiều)
+- [x] Kiểm tra và sửa logic filter ca khám không hoạt động
+- [x] Đảm bảo khi chọn Sáng hoặc Chiều, dữ liệu bảng cập nhật đúng
+- [x] Test filter với dữ liệu thực tế
+
+### 10. Thêm thông tin 'Tổng số ngày khám' trong modal
+- [x] Cập nhật modal popup khi click vào công ty
+- [x] Thêm field "Tổng số ngày khám:" dưới "Tổng số người khám:"
+- [x] Tính toán và hiển thị số ngày khám của công ty
+
+### 11. Fix logic tính toán số lượng khám sáng/chiều
+- [x] Kiểm tra logic đọc dữ liệu từ Google Sheet cho sáng/chiều
+- [x] So sánh với dữ liệu thực tế (ví dụ: sheet có sáng 3, chiều 3 nhưng app hiển thị sáng 2, chiều 2)
+- [x] Sửa logic tính toán để đúng với dữ liệu gốc
+- [x] Test với nhiều công ty khác nhau
+
+### 12. Cập nhật logic phụ thuộc giữa các bộ lọc
+- [x] Đảm bảo filter công ty, nhân viên và ca khám hoạt động độc lập
+- [x] Cập nhật logic để các filter có thể kết hợp với nhau
+- [x] Test tất cả combination của filters
+
+---
+## Progress Tracking Phase 3:
+- Tổng tasks mới: 4
+- Hoàn thành: 4
+- Đang thực hiện: 0
+- Chưa bắt đầu: 0
+
+## ✅ TẤT CẢ TASKS PHASE 3 ĐÃ HOÀN THÀNH!

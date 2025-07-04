@@ -1,8 +1,8 @@
 /**
  * Lịch khám sức khoẻ công ty - HMSG CHC QUOC
- * Phiên bản 2.1 - Cải tiến UX
+ * Phiên bản 2.2 - Cải tiến UX và sửa lỗi
  * Tác giả: System Auto-generated
- * Ngày: 2025-06-30
+ * Ngày: 2025-07-04
  */
 
 // Cấu hình chung
@@ -236,14 +236,16 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
         sang: 0,
         chieu: 0,
         tongNguoi: 0,
+        tongSoNgay: 0,
         employee: record.tenNhanVien ? record.tenNhanVien.trim() : ''
       };
     }
     
-    // Cộng dồn dữ liệu sáng/chiều
-    companyDetails[companyName].sang += sang;
-    companyDetails[companyName].chieu += chieu;
-    companyDetails[companyName].tongNguoi += soNguoiKham;
+    // Lấy giá trị thực tế từ Google Sheet thay vì tính toán
+    companyDetails[companyName].sang = sang;
+    companyDetails[companyName].chieu = chieu;
+    companyDetails[companyName].tongNguoi = soNguoiKham;
+    companyDetails[companyName].tongSoNgay += tongSoNgayKham; // Cộng dồn số ngày khám
     
     // Cập nhật nhân viên nếu chưa có
     if (!companyDetails[companyName].employee && record.tenNhanVien) {
@@ -276,6 +278,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       actualPeoplePerDay = Math.ceil(chieu / actualWorkingDays);
       remainingPeople = chieu;
     } else {
+      // Mặc định là 'total' - lấy tổng số người khám
       actualPeoplePerDay = Math.ceil(soNguoiKham / actualWorkingDays);
       remainingPeople = soNguoiKham;
     }

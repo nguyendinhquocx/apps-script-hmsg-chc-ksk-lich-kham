@@ -174,41 +174,32 @@ function updateEmployeeFilter(employees) {
   }
 }
 
-// Client-side filtering function
+// Filter function - Gửi filter đến server
 function applyFilters() {
   if (!originalData) return;
   
-  let filteredData = JSON.parse(JSON.stringify(originalData)); // Deep clone
+  // Gọi API server để lấy dữ liệu mới với filter
+  showLoading();
   
-  // Apply company search filter
-  if (searchCompany) {
-    filteredData.timeline.rows = filteredData.timeline.rows.filter(row => {
-      if (row.isSpacing || row.company === 'TỔNG') return true;
-      return row.company.toLowerCase().includes(searchCompany.toLowerCase());
-    });
+  google.script.run
+    .withSuccessHandler(onFilterDataLoaded)
+    .withFailureHandler(onDataError)
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter);
+}
+
+function onFilterDataLoaded(data) {
+  hideLoading();
+  
+  if (!data.success) {
+    showError(data.error || 'Có lỗi xảy ra khi tải dữ liệu');
+    return;
   }
   
-  // Apply employee filter
-  if (filterEmployee) {
-    filteredData.timeline.rows = filteredData.timeline.rows.filter(row => {
-      if (row.isSpacing || row.company === 'TỔNG') return true;
-      return row.employee === filterEmployee;
-    });
-  }
+  // Cập nhật data hiện tại (không phải deep clone original)
+  dashboardData = data;
   
-  // Apply show completed filter
-  if (!showCompleted) {
-    filteredData.timeline.rows = filteredData.timeline.rows.filter(row => {
-      if (row.isSpacing || row.company === 'TỔNG') return true;
-      return !isCompanyCompleted(row);
-    });
-  }
-  
-  // Recalculate summary stats based on filtered data
-  filteredData.summary = calculateStats(filteredData.timeline.rows);
-  
-  dashboardData = filteredData;
-  renderDashboard(filteredData);
+  renderDashboard(dashboardData);
+  showDashboard();
 }
 
 // Check if company is completed (all examination dates are in the past)
@@ -588,6 +579,10 @@ function showCompanyDetail(companyName) {
     <div class="detail-row">
       <span class="detail-label">Tổng số người khám:</span>
       <span class="detail-value">${companyDetail.tongNguoi || 0}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Tổng số ngày khám:</span>
+      <span class="detail-value">${companyDetail.tongSoNgay || 0}</span>
     </div>
     ${companyDetail.employee ? `
     <div class="detail-row">
