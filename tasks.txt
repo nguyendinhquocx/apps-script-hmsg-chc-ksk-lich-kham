@@ -1,0 +1,239 @@
+# TASKS - LỊCH KHÁM SỨC KHỎE CÔNG TY HMSG CHC
+## Danh sách công việc cần làm để phát triển và cải tiến hệ thống
+
+### 📊 PHÂN TÍCH HIỆN TRẠNG
+**Mô tả dự án:**
+- Ứng dụng Google Apps Script quản lý lịch khám sức khỏe cho các công ty
+- Dashboard hiển thị timeline khám theo tháng với giao diện hiện đại
+- Tính năng: tìm kiếm công ty, filter nhân viên, ẩn/hiện công ty đã khám xong
+- Tích hợp Google Sheets làm database
+- Responsive design với UX/UI tối ưu
+
+---
+
+### 🚀 NHÓM 1: CẢI TIẾN UX/UI (Ưu tiên cao)
+
+#### 1.1 Tối ưu hiệu suất và tốc độ
+- [ ] **Implement Progressive Loading**: Tải dữ liệu theo chunk thay vì tải toàn bộ
+- [ ] **Lazy Loading**: Chỉ render các dòng trong viewport
+- [ ] **Virtual Scrolling**: Cho bảng timeline lớn (>100 công ty)
+- [ ] **Optimize Cache Strategy**: Tăng thời gian cache, cache theo user
+- [ ] **Minimize DOM manipulation**: Sử dụng DocumentFragment khi render
+
+#### 1.2 Cải tiến giao diện người dùng
+- [ ] **Dark Mode Toggle**: Thêm chế độ tối với color scheme riêng
+- [ ] **Skeleton Loading**: Thay thế spinner bằng skeleton placeholder
+- [ ] **Smooth Transitions**: Thêm animation cho navigation, filters
+- [ ] **Sticky Header Improvements**: Cải thiện sticky behavior khi scroll
+- [ ] **Mobile Navigation**: Redesign cho mobile với drawer navigation
+
+#### 1.3 Accessibility & Usability
+- [ ] **ARIA Labels**: Thêm accessibility attributes cho screen reader
+- [ ] **Keyboard Navigation**: Tab navigation cho toàn bộ UI elements
+- [ ] **Focus Management**: Quản lý focus khi mở/đóng modals
+- [ ] **Color Contrast**: Đảm bảo WCAG 2.1 AA compliance
+- [ ] **Text Scaling**: Support zoom 200% mà không bị break layout
+
+---
+
+### 📈 NHÓM 2: TÍNH NĂNG MỚI (Ưu tiên trung bình)
+
+#### 2.1 Advanced Filtering & Search
+- [ ] **Multi-select Filters**: Chọn nhiều nhân viên, trạng thái cùng lúc
+- [ ] **Date Range Picker**: Filter theo khoảng thời gian tùy chỉnh
+- [ ] **Advanced Search**: Search theo regex, wildcard patterns
+- [ ] **Saved Filters**: Lưu và load lại các bộ filter thường dùng
+- [ ] **Quick Filters**: Preset buttons (hôm nay, tuần này, tháng này)
+
+#### 2.2 Data Visualization
+- [ ] **Chart Integration**: Thêm charts (Chart.js/D3.js) hiển thị trend
+- [ ] **Calendar View**: Xem lịch dạng calendar thay vì timeline
+- [ ] **Heatmap View**: Hiển thị mật độ khám theo heat colors
+- [ ] **Statistics Dashboard**: Trang riêng với các biểu đồ phân tích
+- [ ] **Export Charts**: Export biểu đồ thành PNG/PDF
+
+#### 2.3 Data Management
+- [ ] **Bulk Edit**: Chỉnh sửa nhiều records cùng lúc
+- [ ] **Data Import/Export**: Import từ Excel, export nhiều format
+- [ ] **Backup & Restore**: Tự động backup dữ liệu định kỳ
+- [ ] **Data Validation**: Validate dữ liệu khi nhập/import
+- [ ] **Change History**: Track và hiển thị lịch sử thay đổi
+
+---
+
+### 🔧 NHÓM 3: TECHNICAL IMPROVEMENTS (Ưu tiên cao)
+
+#### 3.1 Architecture & Code Quality
+- [ ] **Code Modularization**: Tách Code.js thành nhiều modules
+- [ ] **TypeScript Migration**: Convert sang TypeScript cho type safety
+- [ ] **Error Handling**: Comprehensive error handling với retry logic
+- [ ] **Unit Testing**: Viết tests cho các hàm core logic
+- [ ] **Code Documentation**: JSDoc cho tất cả functions
+
+#### 3.2 Performance Optimization
+- [ ] **Database Query Optimization**: Tối ưu queries với Google Sheets API
+- [ ] **Caching Strategy**: Multi-level caching (memory, localStorage, server)
+- [ ] **Image Optimization**: Optimize assets, lazy load images
+- [ ] **Bundle Size**: Minify CSS/JS, remove unused code
+- [ ] **CDN Integration**: Use CDN cho static assets
+
+#### 3.3 Security & Reliability
+- [ ] **Input Sanitization**: Sanitize user inputs để tránh injection
+- [ ] **Rate Limiting**: Implement rate limiting cho API calls
+- [ ] **Error Monitoring**: Integrate error tracking (Sentry)
+- [ ] **Data Encryption**: Encrypt sensitive data in sheets
+- [ ] **Access Control**: Role-based permissions
+
+---
+
+### 📱 NHÓM 4: MOBILE & RESPONSIVE (Ưu tiên trung bình)
+
+#### 4.1 Mobile Optimization
+- [ ] **Mobile-First Design**: Redesign cho mobile trước
+- [ ] **Touch Gestures**: Swipe để navigate months, pinch to zoom
+- [ ] **Mobile Menu**: Collapsible sidebar cho mobile
+- [ ] **Optimized Tables**: Horizontal scroll với fixed columns
+- [ ] **PWA Features**: Service Worker, offline capabilities
+
+#### 4.2 Cross-Platform
+- [ ] **iOS Safari Fixes**: Test và fix bugs trên iOS Safari
+- [ ] **Android Chrome**: Optimize cho Android Chrome
+- [ ] **Tablet Layout**: Specific layout cho tablet sizes
+- [ ] **Print Styles**: CSS cho print-friendly pages
+- [ ] **Email Integration**: Generate email-friendly reports
+
+---
+
+### 🔔 NHÓM 5: NOTIFICATIONS & INTEGRATIONS (Ưu tiên thấp)
+
+#### 5.1 Notification System
+- [ ] **Email Notifications**: Gửi email reminder trước ngày khám
+- [ ] **SMS Integration**: SMS notifications qua Twilio/Firebase
+- [ ] **Push Notifications**: Browser push notifications
+- [ ] **Slack Integration**: Bot gửi updates vào Slack channel
+- [ ] **Teams Integration**: Microsoft Teams notifications
+
+#### 5.2 External Integrations
+- [ ] **Google Calendar**: Sync events với Google Calendar
+- [ ] **Outlook Integration**: Sync với Outlook calendar
+- [ ] **API Development**: RESTful API cho external systems
+- [ ] **Webhook Support**: Webhooks cho real-time updates
+- [ ] **Third-party Apps**: Zapier, IFTTT integrations
+
+---
+
+### 📊 NHÓM 6: ANALYTICS & REPORTING (Ưu tiên trung bình)
+
+#### 6.1 Advanced Analytics
+- [ ] **User Analytics**: Track user behavior với Google Analytics
+- [ ] **Performance Metrics**: Monitor app performance
+- [ ] **Custom Reports**: Builder cho custom reports
+- [ ] **Automated Reports**: Tự động generate reports định kỳ
+- [ ] **Data Mining**: Extract insights từ historical data
+
+#### 6.2 Business Intelligence
+- [ ] **Trend Analysis**: Phân tích xu hướng khám theo thời gian
+- [ ] **Capacity Planning**: Dự đoán capacity cần thiết
+- [ ] **Resource Optimization**: Tối ưu phân bổ nhân lực
+- [ ] **Cost Analysis**: Phân tích chi phí theo công ty/thời gian
+- [ ] **ROI Dashboard**: Dashboard đánh giá hiệu quả
+
+---
+
+### 🔮 NHÓM 7: FUTURE ENHANCEMENTS (Ưu tiên thấp)
+
+#### 7.1 AI/ML Features
+- [ ] **Predictive Analytics**: Dự đoán lịch khám tối ưu
+- [ ] **Intelligent Scheduling**: AI suggest thời gian khám
+- [ ] **Anomaly Detection**: Detect bất thường trong data
+- [ ] **Smart Notifications**: AI-powered notification timing
+- [ ] **Chatbot Support**: Chatbot trả lời câu hỏi về lịch
+
+#### 7.2 Advanced Features
+- [ ] **Multi-language**: Support tiếng Anh, tiếng Việt
+- [ ] **Multi-tenant**: Support multiple organizations
+- [ ] **Workflow Engine**: Custom workflows cho approval
+- [ ] **Document Management**: Attach files, documents
+- [ ] **Video Integration**: Video calls integration
+
+---
+
+### 🚨 NHÓM 8: BUG FIXES & MAINTENANCE (Ưu tiên cao)
+
+#### 8.1 Critical Bugs
+- [ ] **Date Parsing**: Fix edge cases trong parseDate function
+- [ ] **Timezone Issues**: Ensure consistent timezone handling
+- [ ] **Memory Leaks**: Fix potential memory leaks trong EventListeners
+- [ ] **Safari Compatibility**: Fix CSS/JS issues trên Safari
+- [ ] **Edge Cases**: Handle empty data, invalid inputs
+
+#### 8.2 Performance Issues
+- [ ] **Large Dataset**: Optimize cho datasets >1000 companies
+- [ ] **Slow Rendering**: Optimize DOM rendering for large tables
+- [ ] **Cache Issues**: Fix cache invalidation problems
+- [ ] **Network Issues**: Better handling của network failures
+- [ ] **Resource Usage**: Optimize memory và CPU usage
+
+---
+
+### 📝 NHÓM 9: DOCUMENTATION & TESTING (Ưu tiên trung bình)
+
+#### 9.1 Documentation
+- [ ] **User Manual**: Hướng dẫn sử dụng chi tiết
+- [ ] **Developer Guide**: Documentation cho developers
+- [ ] **API Documentation**: Document các functions/APIs
+- [ ] **Troubleshooting**: Guide xử lý lỗi thường gặp
+- [ ] **Video Tutorials**: Tạo video hướng dẫn
+
+#### 9.2 Testing & QA
+- [ ] **Unit Tests**: Test coverage >80%
+- [ ] **Integration Tests**: Test tích hợp với Google Sheets
+- [ ] **E2E Tests**: End-to-end testing với Puppeteer
+- [ ] **Performance Tests**: Load testing, stress testing
+- [ ] **Manual Testing**: Checklist cho manual QA
+
+---
+
+### 🎯 ROADMAP THỰC HIỆN (Đề xuất)
+
+#### Phase 1 (1-2 tháng): Foundation
+- Technical improvements (3.1, 3.2)
+- Critical bug fixes (8.1, 8.2)
+- Basic UX improvements (1.1, 1.2)
+
+#### Phase 2 (2-3 tháng): Core Features
+- Advanced filtering (2.1)
+- Mobile optimization (4.1)
+- Data visualization (2.2)
+
+#### Phase 3 (3-4 tháng): Advanced
+- Notifications (5.1)
+- Analytics (6.1)
+- PWA features (4.1)
+
+#### Phase 4 (4+ tháng): Innovation
+- AI features (7.1)
+- External integrations (5.2)
+- Advanced business intelligence (6.2)
+
+---
+
+### 📋 CHECKLIST CHUNG
+- [ ] Setup development environment
+- [ ] Create testing framework
+- [ ] Establish code review process
+- [ ] Setup CI/CD pipeline
+- [ ] Create staging environment
+- [ ] Document current system
+- [ ] Backup current data
+- [ ] Plan rollback strategy
+
+---
+
+**Ghi chú:** 
+- Ưu tiên cao = Làm ngay
+- Ưu tiên trung bình = 1-3 tháng tới
+- Ưu tiên thấp = 3+ tháng tới
+
+**Ước tính thời gian tổng:** 6-12 tháng cho tất cả tasks (tùy team size)
+**Team đề xuất:** 2-3 developers, 1 designer, 1 QA
