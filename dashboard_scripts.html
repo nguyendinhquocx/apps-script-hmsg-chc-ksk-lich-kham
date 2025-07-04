@@ -7,6 +7,7 @@ let searchCompany = '';
 let filterEmployee = '';
 let dashboardData = null;
 let originalData = null; // Keep original unfiltered data
+const scriptUrl = '<?= scriptUrl ?>';
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -89,10 +90,19 @@ function loadCurrentMonth() {
 function loadData() {
   showLoading();
   
-  google.script.run
-    .withSuccessHandler(onDataLoaded)
-    .withFailureHandler(onDataError)
-    .getScheduleData(currentMonth, currentYear, false, '', ''); // Always load all data first
+  const params = new URLSearchParams({
+    action: 'getScheduleData',
+    month: currentMonth,
+    year: currentYear,
+    showCompleted: false, // Always load all data first
+    searchCompany: '',
+    filterEmployee: ''
+  });
+
+  fetch(`${scriptUrl}?${params.toString()}`)
+    .then(response => response.json())
+    .then(onDataLoaded)
+    .catch(onDataError);
 }
 
 function refreshData() {
@@ -106,10 +116,12 @@ function refreshData() {
   document.getElementById('employeeFilter').value = '';
   document.getElementById('showCompleted').checked = false;
   
-  google.script.run
-    .withSuccessHandler(onRefreshDataLoaded)
-    .withFailureHandler(onDataError)
-    .refreshCache();
+  const params = new URLSearchParams({ action: 'refreshCache' });
+
+  fetch(`${scriptUrl}?${params.toString()}`)
+    .then(response => response.json())
+    .then(onRefreshDataLoaded)
+    .catch(onDataError);
 }
 
 function onDataLoaded(data) {
