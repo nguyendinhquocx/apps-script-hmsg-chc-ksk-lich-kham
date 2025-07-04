@@ -28,13 +28,13 @@ function include(filename) {
 /**
  * Lấy dữ liệu với tháng cụ thể và filter trạng thái
  */
-function getScheduleData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '') {
+function getScheduleData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total') {
   try {
     const currentDate = new Date();
     const targetMonth = month || (currentDate.getMonth() + 1);
     const targetYear = year || currentDate.getFullYear();
     
-    const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}_${searchCompany}_${filterEmployee}`;
+    const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}_${searchCompany}_${filterEmployee}_${shiftFilter}`;
     const cache = CacheService.getScriptCache();
     const cachedData = cache.get(cacheKey);
     
@@ -43,7 +43,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
       return JSON.parse(cachedData);
     }
 
-    console.log(`Lấy dữ liệu tháng ${targetMonth}/${targetYear}, showCompleted: ${showCompleted}`);
+    console.log(`Lấy dữ liệu tháng ${targetMonth}/${targetYear}, showCompleted: ${showCompleted}, shiftFilter: ${shiftFilter}`);
     
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
     const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
@@ -94,7 +94,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
     console.log(`Dữ liệu sau filter: ${filteredData.length} records`);
 
     // Tổng hợp dữ liệu
-    const processedData = processScheduleData(filteredData, targetMonth, targetYear, showCompleted);
+    const processedData = processScheduleData(filteredData, targetMonth, targetYear, showCompleted, shiftFilter);
     
     // Cache kết quả
     cache.put(cacheKey, JSON.stringify(processedData), CONFIG.CACHE_DURATION);
@@ -183,12 +183,13 @@ function adjustForWorkingDays(startDate, endDate, totalDays) {
 /**
  * Xử lý dữ liệu với tránh chủ nhật
  */
-function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
+function processScheduleData(rawData, targetMonth, targetYear, showCompleted, shiftFilter = 'total') {
   const companySchedules = {};
   const dailyTotals = {};
   const companyStatus = {};
   const companyTotals = {}; // Tổng mỗi công ty
   const companyEmployees = {}; // Map company to employee
+  const companyDetails = {}; // Lưu thông tin sáng/chiều cho mỗi công ty
   const employees = new Set(); // Danh sách nhân viên
   
   // Lọc dữ liệu có giao thoa với tháng target
@@ -212,6 +213,8 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
     const tongSoNgayKham = parseInt(record.tongSoNgayKham) || 1;
     const companyName = record.tenCongTy.trim();
     const trangThaiKham = record.trangThaiKham || 'Chưa khám xong';
+    const sang = parseInt(record.sang) || 0;
+    const chieu = parseInt(record.chieu) || 0;
     
     if (!startDate || !endDate || soNguoiKham === 0) return;
     
@@ -224,8 +227,28 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
       }
     }
     
-    // Lưu trạng thái công ty
+    // Lưu trạng thái công ty và thông tin sáng/chiều
     companyStatus[companyName] = trangThaiKham;
+    
+    // Cập nhật thông tin sáng/chiều - cộng dồn nếu đã có
+    if (!companyDetails[companyName]) {
+      companyDetails[companyName] = {
+        sang: 0,
+        chieu: 0,
+        tongNguoi: 0,
+        employee: record.tenNhanVien ? record.tenNhanVien.trim() : ''
+      };
+    }
+    
+    // Cộng dồn dữ liệu sáng/chiều
+    companyDetails[companyName].sang += sang;
+    companyDetails[companyName].chieu += chieu;
+    companyDetails[companyName].tongNguoi += soNguoiKham;
+    
+    // Cập nhật nhân viên nếu chưa có
+    if (!companyDetails[companyName].employee && record.tenNhanVien) {
+      companyDetails[companyName].employee = record.tenNhanVien.trim();
+    }
     
     if (!companySchedules[companyName]) {
       companySchedules[companyName] = {};
@@ -240,16 +263,29 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
     
     const nguoiKhamMoiNgay = Math.ceil(soNguoiKham / actualWorkingDays);
     
-    // Phân bổ người khám cho từng ngày làm việc
+    // Phân bổ người khám cho từng ngày làm việc dựa trên shift filter
     let remainingPeople = soNguoiKham;
     let remainingDays = actualWorkingDays;
+    
+    // Tính số người khám dựa trên shift filter
+    let actualPeoplePerDay = 0;
+    if (shiftFilter === 'morning') {
+      actualPeoplePerDay = Math.ceil(sang / actualWorkingDays);
+      remainingPeople = sang;
+    } else if (shiftFilter === 'afternoon') {
+      actualPeoplePerDay = Math.ceil(chieu / actualWorkingDays);
+      remainingPeople = chieu;
+    } else {
+      actualPeoplePerDay = Math.ceil(soNguoiKham / actualWorkingDays);
+      remainingPeople = soNguoiKham;
+    }
     
     workingDays.slice(0, actualWorkingDays).forEach(workDate => {
       if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
         const dateKey = formatDateKey(workDate);
         const peopleToday = remainingDays === 1 ? 
           remainingPeople : 
-          Math.min(nguoiKhamMoiNgay, remainingPeople);
+          Math.min(actualPeoplePerDay, remainingPeople);
         
         companySchedules[companyName][dateKey] = 
           (companySchedules[companyName][dateKey] || 0) + peopleToday;
@@ -292,6 +328,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted) {
   return {
     success: true,
     timeline: timeline,
+    companyDetails: companyDetails, // Thêm thông tin chi tiết công ty
     summary: {
       totalCompanies: Object.keys(companySchedules).length,
       completedCompanies: statusCounts.completed,
@@ -380,6 +417,24 @@ function getEmployeeList() {
     console.error('Lỗi lấy danh sách nhân viên:', error);
     return [];
   }
+}
+
+/**
+ * Tính tổng số nhân viên sáng/chiều cho tất cả công ty
+ */
+function calculateTotalShifts(companyDetails) {
+  let totalSang = 0;
+  let totalChieu = 0;
+  
+  Object.values(companyDetails).forEach(detail => {
+    totalSang += detail.sang || 0;
+    totalChieu += detail.chieu || 0;
+  });
+  
+  return {
+    sang: totalSang,
+    chieu: totalChieu
+  };
 }
 
 // Các hàm utility giữ nguyên

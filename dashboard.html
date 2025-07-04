@@ -29,6 +29,12 @@
             <option value="">Tất cả nhân viên</option>
           </select>
           
+          <select id="shiftFilter" class="filter-select">
+            <option value="total">Tổng</option>
+            <option value="morning">Sáng</option>
+            <option value="afternoon">Chiều</option>
+          </select>
+          
           <div class="filter-group">
             <label class="filter-label">
               <input type="checkbox" id="showCompleted" class="filter-checkbox">
@@ -55,7 +61,7 @@
 
     <!-- Dashboard Content -->
     <div id="dashboard" class="dashboard" style="display: none;">
-      <!-- Statistics - 5 cards theo thứ tự mới -->
+      <!-- Statistics - 4 cards sau khi bỏ "Công ty chưa khám" -->
       <div class="stats">
         <div class="stat-item">
           <div class="stat-value" id="totalCompanies">0</div>
@@ -70,11 +76,6 @@
         <div class="stat-item">
           <div class="stat-value" id="activeCompanies">0</div>
           <div class="stat-label">Công ty đang khám</div>
-        </div>
-        
-        <div class="stat-item">
-          <div class="stat-value" id="pendingCompanies">0</div>
-          <div class="stat-label">Công ty chưa khám</div>
         </div>
         
         <div class="stat-item">
@@ -106,8 +107,21 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <?!= include('dashboard_scripts'); ?>
+    <!-- Modal popup cho thông tin chi tiết -->
+    <div id="detailModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle" class="modal-title">Thông tin chi tiết</h3>
+          <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+          <!-- Nội dung sẽ được điền động -->
+        </div>
+      </div>
+    </div>
+
+    <?!= include('dashboard_scripts'); ?>
+  </div>
 </body>
 </html>
