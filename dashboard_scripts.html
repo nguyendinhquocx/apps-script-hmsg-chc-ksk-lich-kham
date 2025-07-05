@@ -539,7 +539,40 @@ function showCompanyDetail(companyName) {
   const modalTitle = document.getElementById('modalTitle');
   const modalBody = document.getElementById('modalBody');
   
-  modalTitle.textContent = companyName;
+  // 🔧 FIX: Thêm thông tin filter vào title
+  let titleText = companyName;
+  if (shiftFilter === 'sang' || shiftFilter === 'morning') {
+    titleText += ' (Ca sáng)';
+  } else if (shiftFilter === 'chieu' || shiftFilter === 'afternoon') {
+    titleText += ' (Ca chiều)';
+  }
+  
+  modalTitle.textContent = titleText;
+  
+  // 🔧 FIX: Tính tổng số lượng khám sáng/chiều (số lượng trung bình ngày * số ngày) dựa trên shiftFilter hiện tại
+  let displayMorning = 0;
+  let displayAfternoon = 0;
+  let displayTotal = 0;
+  
+  // Lấy tổng số ngày khám
+  const totalDays = companyDetail.tongSoNgay || 0;
+  
+  if (shiftFilter === 'total') {
+    // Hiển thị tổng số lượng khám chia đều 50/50
+    displayTotal = companyDetail.tongNguoi || 0;
+    displayMorning = Math.round(displayTotal / 2);
+    displayAfternoon = displayTotal - displayMorning; // Đảm bảo tổng bằng displayTotal
+  } else if (shiftFilter === 'sang' || shiftFilter === 'morning') {
+    // Chỉ hiển thị tổng ca sáng, ca chiều = 0
+    displayMorning = (companyDetail.sang || 0) * totalDays;
+    displayAfternoon = 0;
+    displayTotal = displayMorning;
+  } else if (shiftFilter === 'chieu' || shiftFilter === 'afternoon') {
+    // Chỉ hiển thị tổng ca chiều, ca sáng = 0
+    displayMorning = 0;
+    displayAfternoon = (companyDetail.chieu || 0) * totalDays;
+    displayTotal = displayAfternoon;
+  }
   
   // Định dạng ngày bắt đầu và kết thúc khám
   const startDate = companyDetail.ngayBatDau || '';
@@ -549,15 +582,15 @@ function showCompanyDetail(companyName) {
   modalBody.innerHTML = `
     <div class="detail-row">
       <span class="detail-label">Số lượng khám sáng:</span>
-      <span class="detail-value">${companyDetail.sang || 0}</span>
+      <span class="detail-value">${displayMorning}</span>
     </div>
     <div class="detail-row">
       <span class="detail-label">Số lượng khám chiều:</span>
-      <span class="detail-value">${companyDetail.chieu || 0}</span>
+      <span class="detail-value">${displayAfternoon}</span>
     </div>
     <div class="detail-row">
       <span class="detail-label">Tổng số người khám:</span>
-      <span class="detail-value">${companyDetail.tongNguoi || 0}</span>
+      <span class="detail-value">${displayTotal}</span>
     </div>
     <div class="detail-row">
       <span class="detail-label">Tổng số ngày khám:</span>
@@ -595,12 +628,31 @@ function showTotalDetail() {
       if (row.company && row.company !== 'TỔNG' && !row.isSpacing) {
         const companyDetail = originalData.companyDetails[row.company];
         if (companyDetail) {
-          totalSang += companyDetail.sang || 0;
-          totalChieu += companyDetail.chieu || 0;
-          totalNguoi += companyDetail.tongNguoi || 0;
+          // Lấy tổng số ngày khám của công ty
+          const totalDays = companyDetail.tongSoNgay || 0;
+          
+          // 🔧 FIX: Tính toán tổng số lượng khám (số lượng trung bình ngày * số ngày) dựa trên shiftFilter hiện tại
+          if (shiftFilter === 'total') {
+            // Chỉ cộng dồn tổng số người khám, sau đó sẽ chia đều ở bên dưới
+            totalNguoi += companyDetail.tongNguoi || 0;
+          } else if (shiftFilter === 'sang' || shiftFilter === 'morning') {
+            totalSang += (companyDetail.sang || 0) * totalDays;
+            totalChieu = 0; // Không hiển thị ca chiều khi filter ca sáng
+            totalNguoi += (companyDetail.sang || 0) * totalDays;
+          } else if (shiftFilter === 'chieu' || shiftFilter === 'afternoon') {
+            totalSang = 0; // Không hiển thị ca sáng khi filter ca chiều
+            totalChieu += (companyDetail.chieu || 0) * totalDays;
+            totalNguoi += (companyDetail.chieu || 0) * totalDays;
+          }
         }
       }
     });
+  }
+  
+  // Nếu đang xem tổng (không filter), chia đều tổng số người khám thành hai phần bằng nhau
+  if (shiftFilter === 'total') {
+    totalSang = Math.round(totalNguoi / 2);
+    totalChieu = totalNguoi - totalSang; // Đảm bảo tổng bằng totalNguoi
   }
   
   const modal = document.getElementById('detailModal');
@@ -689,17 +741,8 @@ function showDailyTotalDetail(day, dayIndex) {
           
           // Tính số lượng khám sáng/chiều dựa trên shiftFilter hiện tại
           if (shiftFilter === 'total') {
-            // Nếu đang xem tổng, tính theo tỷ lệ thực tế của công ty
-            const companyDetail = originalData.companyDetails[row.company];
-            if (companyDetail) {
-              const totalCompanyPeople = companyDetail.tongNguoi || 0;
-              if (totalCompanyPeople > 0) {
-                const morningRatio = (companyDetail.sang || 0) / totalCompanyPeople;
-                const afternoonRatio = (companyDetail.chieu || 0) / totalCompanyPeople;
-                morningExams += Math.round(peopleCount * morningRatio);
-                afternoonExams += Math.round(peopleCount * afternoonRatio);
-              }
-            }
+            // Không tính theo tỷ lệ thực tế của công ty nữa mà chia đều 50/50
+            // Cộng dồn số người khám, sau đó sẽ chia đều ở bên dưới
           } else if (shiftFilter === 'sang' || shiftFilter === 'morning') {
             // Nếu đang filter ca sáng, tất cả số người đều là ca sáng
             morningExams += peopleCount;
@@ -723,6 +766,12 @@ function showDailyTotalDetail(day, dayIndex) {
   
   // Sắp xếp công ty theo số người khám (nhiều nhất lên đầu)
   companiesWithAppointments.sort((a, b) => b.people - a.people);
+  
+  // Nếu đang xem tổng (không filter), chia đều tổng số người khám thành hai phần bằng nhau
+  if (shiftFilter === 'total') {
+    morningExams = Math.round(totalPeopleToday / 2);
+    afternoonExams = totalPeopleToday - morningExams; // Đảm bảo tổng bằng totalPeopleToday
+  }
   
   const modal = document.getElementById('detailModal');
   const modalTitle = document.getElementById('modalTitle');
