@@ -1,8 +1,8 @@
 /**
  * Lịch khám sức khoẻ công ty - HMSG CHC QUOC
- * Phiên bản 2.4 - Fix logic shift filter sáng/chiều
+ * Phiên bản 2.5 - Fix UI dropdown styling + Cross-month logic
  * Tác giả: System Auto-generated
- * Ngày: 2025-07-04
+ * Ngày: 2025-07-05
  */
 
 // Cấu hình chung
@@ -34,7 +34,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
     const targetMonth = month || (currentDate.getMonth() + 1);
     const targetYear = year || currentDate.getFullYear();
     
-    // 🔧 FIX: Cache key phải include shiftFilter và timeFilter để tránh cache sai
+    // Cache key phải include shiftFilter và timeFilter để tránh cache sai
     const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}_${searchCompany}_${filterEmployee}_${shiftFilter}_${timeFilter}`;
     const cache = CacheService.getScriptCache();
     const cachedData = cache.get(cacheKey);
@@ -181,7 +181,7 @@ function adjustForWorkingDays(startDate, endDate, totalDays) {
 }
 
 /**
- * 🔧 FIX: Xử lý dữ liệu với logic ĐÚNG cho shift filter và time filter
+ * 🔧 FIX: Xử lý dữ liệu với logic ĐÚNG cho cross-month scheduling
  */
 function processScheduleData(rawData, targetMonth, targetYear, showCompleted, shiftFilter = 'total', timeFilter = 'all') {
   const companySchedules = {};
@@ -259,64 +259,49 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       companyTotals[companyName] = 0;
     }
     
-    // Điều chỉnh lịch để tránh chủ nhật
-    const workingDays = adjustForWorkingDays(startDate, endDate, tongSoNgayKham);
-    const actualWorkingDays = Math.min(workingDays.length, tongSoNgayKham);
+    // 🔧 FIX: Cross-month logic - chỉ tính ngày trong target month
+    const targetMonthStart = new Date(targetYear, targetMonth - 1, 1);
+    const targetMonthEnd = new Date(targetYear, targetMonth, 0);
     
-    if (actualWorkingDays === 0) return;
+    // Cắt ngày bắt đầu và kết thúc theo target month
+    const effectiveStartDate = startDate < targetMonthStart ? targetMonthStart : startDate;
+    const effectiveEndDate = endDate > targetMonthEnd ? targetMonthEnd : endDate;
     
-    // 🔧 FIX: Logic ĐÚNG tính số người khám dựa trên shift filter
-    let totalPeopleToDistribute = 0;
+    // Điều chỉnh lịch để tránh chủ nhật - chỉ trong target month
+    const workingDays = adjustForWorkingDays(effectiveStartDate, effectiveEndDate, tongSoNgayKham);
+    const actualWorkingDaysInMonth = workingDays.filter(day => 
+      day >= targetMonthStart && day <= targetMonthEnd
+    );
+    
+    if (actualWorkingDaysInMonth.length === 0) return;
+    
+    // 🔧 FIX: Logic ĐÚNG tính số người khám dựa trên số ngày THỰC TẾ trong target month
     let peoplePerDay = 0;
     
     if (shiftFilter === 'morning' || shiftFilter === 'sang') {
-      // ✅ ĐÚNG: sang = số người khám sáng mỗi ngày
-      // totalPeopleToDistribute = số người sáng × số ngày thực tế
-      totalPeopleToDistribute = sang * actualWorkingDays;
-      peoplePerDay = sang;
-      console.log(`🌅 Sáng - Company: ${companyName}, Per day: ${sang}, Total days: ${actualWorkingDays}, Total: ${totalPeopleToDistribute}`);
+      peoplePerDay = sang; // Số người sáng mỗi ngày
+      console.log(`🌅 Sáng - Company: ${companyName}, Per day: ${sang}, Days in month: ${actualWorkingDaysInMonth.length}`);
     } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
-      // ✅ ĐÚNG: chieu = số người khám chiều mỗi ngày  
-      // totalPeopleToDistribute = số người chiều × số ngày thực tế
-      totalPeopleToDistribute = chieu * actualWorkingDays;
-      peoplePerDay = chieu;
-      console.log(`🌆 Chiều - Company: ${companyName}, Per day: ${chieu}, Total days: ${actualWorkingDays}, Total: ${totalPeopleToDistribute}`);
+      peoplePerDay = chieu; // Số người chiều mỗi ngày  
+      console.log(`🌆 Chiều - Company: ${companyName}, Per day: ${chieu}, Days in month: ${actualWorkingDaysInMonth.length}`);
     } else {
-      // Mặc định là 'total' - phân bổ đều tổng số người
-      totalPeopleToDistribute = soNguoiKham;
-      peoplePerDay = Math.ceil(soNguoiKham / actualWorkingDays);
-      console.log(`📊 Tổng - Company: ${companyName}, Total: ${soNguoiKham}, Per day: ${peoplePerDay}, Total days: ${actualWorkingDays}`);
+      // Tổng: Tính trung bình người/ngày trong toàn bộ thời gian khám
+      peoplePerDay = Math.ceil(soNguoiKham / tongSoNgayKham);
+      console.log(`📊 Tổng - Company: ${companyName}, Total: ${soNguoiKham}, Per day: ${peoplePerDay}, Days in month: ${actualWorkingDaysInMonth.length}`);
     }
     
-    // 🔧 FIX: Phân bổ người khám cho từng ngày làm việc
-    let remainingPeople = totalPeopleToDistribute;
-    let remainingDays = actualWorkingDays;
-    
-    workingDays.slice(0, actualWorkingDays).forEach(workDate => {
-      if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
-        const dateKey = formatDateKey(workDate);
-        
-        // ✅ ĐÚNG: Với shift filter sang/chiều: mỗi ngày cố định số người
-        let peopleToday;
-        if (shiftFilter === 'morning' || shiftFilter === 'sang' || shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
-          peopleToday = peoplePerDay;  // Số người cố định mỗi ngày
-        } else {
-          // Với total: phân bổ đều
-          peopleToday = remainingDays === 1 ? 
-            remainingPeople : 
-            Math.min(peoplePerDay, remainingPeople);
-        }
-        
-        companySchedules[companyName][dateKey] = 
-          (companySchedules[companyName][dateKey] || 0) + peopleToday;
-        
-        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peopleToday;
-        companyTotals[companyName] = (companyTotals[companyName] || 0) + peopleToday;
-        
-        remainingPeople -= peopleToday;
-      }
+    // 🔧 FIX: Phân bổ người khám chỉ cho các ngày trong target month
+    actualWorkingDaysInMonth.forEach(workDate => {
+      const dateKey = formatDateKey(workDate);
       
-      remainingDays--;
+      // Đảm bảo ngày thuộc target month
+      if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
+        companySchedules[companyName][dateKey] = 
+          (companySchedules[companyName][dateKey] || 0) + peoplePerDay;
+        
+        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peoplePerDay;
+        companyTotals[companyName] = (companyTotals[companyName] || 0) + peoplePerDay;
+      }
     });
   });
   
@@ -348,10 +333,10 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
 
   const timeline = createTimelineData(filteredCompanySchedules, dailyTotals, companyTotals, targetMonth, targetYear, companyEmployees);
 
-  // 🔧 FIX: Tính lại statistics dựa trên filtered data
+  // Tính lại statistics dựa trên filtered data
   const filteredStats = calculateFilteredStats(timeline, shiftFilter);
   
-  // 🔧 FIX: Tính lại statusCounts dựa trên filtered companies để tránh số âm
+  // Tính lại statusCounts dựa trên filtered companies để tránh số âm
   const filteredStatusCounts = { completed: 0, pending: 0 };
   Object.keys(filteredCompanySchedules).forEach(companyName => {
     const status = companyStatus[companyName] || '';
@@ -371,21 +356,21 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       totalCompanies: Object.keys(filteredCompanySchedules).length,
       completedCompanies: filteredStatusCounts.completed,
       pendingCompanies: filteredStatusCounts.pending,
-      activeCompanies: filteredStatusCounts.pending, // Công ty đang khám = pending companies
+      activeCompanies: filteredStatusCounts.pending,
       currentMonth: targetMonth,
       currentYear: targetYear,
       maxPeoplePerDay: filteredStats.maxPeoplePerDay,
       averagePerDay: filteredStats.averagePerDay,
       totalRecords: rawData.length,
       processedRecords: targetMonthData.length,
-      shiftFilter: shiftFilter // Track current filter
+      shiftFilter: shiftFilter
     },
     employees: Array.from(employees).sort()
   };
 }
 
 /**
- * 🔧 NEW: Tính statistics dựa trên filtered timeline data
+ * Tính statistics dựa trên filtered timeline data
  */
 function calculateFilteredStats(timeline, shiftFilter) {
   if (!timeline.rows || timeline.rows.length === 0) {

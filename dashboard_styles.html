@@ -118,7 +118,7 @@ body {
   color: #94a3b8;
 }
 
-/* 🔧 FIX: Filter Select với dropdown options có viền đẹp */
+/* 🔧 FIX: Enhanced dropdown styling với border-bottom đẹp */
 .filter-select, .time-filter-select {
   padding: 8px 12px;
   border: 1px solid #d1d5db;
@@ -128,6 +128,16 @@ body {
   color: #1a1a1a;
   cursor: pointer;
   transition: all 0.15s ease;
+  
+  /* Custom dropdown arrow */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+  padding-right: 32px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
 }
 
 .filter-select {
@@ -144,21 +154,52 @@ body {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-/* 🔧 FIX: Dropdown options với viền dưới đẹp */
+/* 🔧 FIX: Dropdown options với border-bottom đẹp */
 .filter-select option, .time-filter-select option {
-  padding: 10px 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid #e2e8f0;
   background: #ffffff;
   color: #1a1a1a;
   font-size: 14px;
+  line-height: 1.4;
+  transition: background-color 0.15s ease;
 }
 
+/* Option cuối cùng không có border */
 .filter-select option:last-child, .time-filter-select option:last-child {
   border-bottom: none;
 }
 
+/* Hover state cho options */
 .filter-select option:hover, .time-filter-select option:hover {
   background: #f8fafc;
+  color: #1a1a1a;
+}
+
+/* Selected option */
+.filter-select option:checked, .time-filter-select option:checked {
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+/* 🔧 FIX: Đảm bảo dropdown container có đủ z-index và styling */
+.search-filters select::-webkit-scrollbar {
+  width: 8px;
+}
+
+.search-filters select::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.search-filters select::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.search-filters select::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* Filter Checkbox */
@@ -193,7 +234,7 @@ body {
   font-weight: 500;
 }
 
-/* Update Button - No rotation */
+/* Update Button */
 .update-btn {
   background: #ffffff;
   border: 1px solid #d1d5db;
@@ -367,7 +408,7 @@ body {
   font-weight: 700;
 }
 
-/* Column Headers - Sticky với z-index cao nhất và bỏ box-shadow */
+/* Column Headers - Sticky với z-index cao nhất */
 .company-header {
   text-align: left !important;
   width: 300px;
@@ -395,7 +436,7 @@ body {
   border-right: 1px solid #e2e8f0;
 }
 
-/* Table Body - Borderless */
+/* Table Body */
 .timeline-table td {
   padding: 6px;
   text-align: center;
@@ -406,7 +447,7 @@ body {
   background: #ffffff;
 }
 
-/* Company cells - Bỏ box-shadow, chỉ giữ style tối giản */
+/* Company cells */
 .company-cell {
   text-align: left !important;
   font-weight: 500 !important;
@@ -424,7 +465,7 @@ body {
   color: #1a1a1a;
 }
 
-/* People cells - Bỏ box-shadow */
+/* People cells */
 .people-cell {
   background: #ffffff !important;
   font-weight: 600 !important;
@@ -713,7 +754,7 @@ body {
   }
 }
 
-/* Clickable styling cho công ty và tổng */
+/* Clickable styling */
 .company-cell.clickable,
 .total-row.clickable,
 .data-cell.clickable {
@@ -736,7 +777,6 @@ body {
   font-weight: 700;
 }
 
-/* Hiệu ứng hover cho ô dữ liệu clickable trong hàng tổng */
 .total-row .data-cell.clickable:hover .data-cell-inner {
   transform: scale(1.15);
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
