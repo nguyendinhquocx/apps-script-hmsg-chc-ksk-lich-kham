@@ -137,6 +137,12 @@ body {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
+/* Thêm viền dưới cho dropdown */
+.filter-select option {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px;
+}
+
 /* Filter Checkbox */
 .filter-group {
   display: flex;
@@ -312,8 +318,9 @@ body {
   color: #64748b;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .weekday-row th.today {
@@ -330,9 +337,10 @@ body {
   background: #ffffff;
   position: sticky;
   top: 28px;
-  z-index: 10;
+  z-index: 20;
   color: #1a1a1a;
   border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .date-row th.today {
@@ -350,8 +358,9 @@ body {
   position: sticky;
   left: 0;
   background: #ffffff !important;
-  z-index: 11;
+  z-index: 30;
   border: none !important;
+  border-right: 1px solid #e2e8f0;
 }
 
 .people-header {
@@ -361,10 +370,11 @@ body {
   position: sticky;
   left: 300px;
   background: #ffffff !important;
-  z-index: 11;
+  z-index: 30;
   color: #2563eb !important;
   font-weight: 700 !important;
   border: none !important;
+  border-right: 1px solid #e2e8f0;
 }
 
 /* Table Body - Borderless */
@@ -385,7 +395,7 @@ body {
   background: #ffffff;
   position: sticky;
   left: 0;
-  z-index: 5;
+  z-index: 15;
   width: 300px;
   min-width: 300px;
   max-width: 300px;
@@ -394,6 +404,7 @@ body {
   font-size: 13px;
   padding: 8px 12px;
   color: #1a1a1a;
+  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.05);
 }
 
 /* People cells */
@@ -403,9 +414,10 @@ body {
   color: #2563eb !important;
   position: sticky;
   left: 300px;
-  z-index: 5;
+  z-index: 15;
   width: 80px;
   min-width: 80px;
+  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.05);
 }
 
 /* Data cells - Rounded với spacing */
@@ -463,13 +475,13 @@ body {
 
 /* Total row - Đường kẻ ngang đen */
 .total-row {
-  border-top: 2px solid #000000 !important;
+  border-top: 1px solid #000000 !important;
 }
 
 .total-row td {
   background: #ffffff;
   font-weight: 700;
-  border-top: 2px solid #000000 !important;
+  border-top: 1px solid #000000 !important;
 }
 
 .total-row .company-cell {
@@ -477,7 +489,7 @@ body {
   font-weight: 700 !important;
   color: #1a1a1a !important;
   font-size: 14px !important;
-  border-top: 2px solid #000000 !important;
+  border-top: 1px solid #000000 !important;
 }
 
 .total-row .people-cell {
@@ -485,11 +497,11 @@ body {
   color: #2563eb !important;
   font-size: 16px !important;
   font-weight: 800 !important;
-  border-top: 2px solid #000000 !important;
+  border-top: 1px solid #000000 !important;
 }
 
 .total-row .data-cell {
-  border-top: 2px solid #000000 !important;
+  border-top: 1px solid #000000 !important;
 }
 
 .total-row .data-cell.has-data .data-cell-inner {
@@ -788,5 +800,52 @@ button:focus, input:focus, select:focus {
 
 .timeline-container::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Sửa lỗi che lấp khi kéo ngang */
+.weekday-row th, .date-row th {
+  z-index: 20;
+}
+
+.company-header, .people-header {
+  z-index: 30;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+}
+
+.company-cell, .people-cell {
+  z-index: 25;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Thêm hiệu ứng nổi cho các cột cố định */
+.company-header, .company-cell {
+  background: #ffffff !important;
+}
+
+.people-header, .people-cell {
+  background: #ffffff !important;
+}
+
+/* Thêm style cho bộ lọc thời gian */
+.time-filter-select {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #1a1a1a;
+  min-width: 120px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.time-filter-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.time-filter-select option {
+  padding: 8px;
 }
 </style>

@@ -6,6 +6,7 @@ let showCompleted = false;
 let searchCompany = '';
 let filterEmployee = '';
 let shiftFilter = 'total'; // Mặc định là Tổng
+let timeFilter = 'all'; // Mặc định là Tất cả thời gian
 let dashboardData = null;
 let originalData = null; // Keep original unfiltered data
 
@@ -40,11 +41,22 @@ function initializeApp() {
     applyFilters();
   });
   
-  // Shift filter - immediate response
+  // 🔧 FIX: Shift filter - immediate response với server call
   document.getElementById('shiftFilter').addEventListener('change', (e) => {
     shiftFilter = e.target.value;
-    console.log('Đã chọn shift filter: ' + shiftFilter);
-    applyFilters();
+    console.log('🔧 Đã chọn shift filter: ' + shiftFilter);
+    
+    // 🚀 Quan trọng: Gọi lại server với shiftFilter mới
+    loadDataWithCurrentFilters();
+  });
+  
+  // Time filter - immediate response với server call
+  document.getElementById('timeFilter').addEventListener('change', (e) => {
+    timeFilter = e.target.value;
+    console.log('🔧 Đã chọn time filter: ' + timeFilter);
+    
+    // Gọi lại server với timeFilter mới
+    loadDataWithCurrentFilters();
   });
   
   // Completed filter checkbox
@@ -100,7 +112,17 @@ function loadData() {
   google.script.run
     .withSuccessHandler(onDataLoaded)
     .withFailureHandler(onDataError)
-    .getScheduleData(currentMonth, currentYear, false, '', '', shiftFilter); // Thêm shiftFilter parameter
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+}
+
+// 🔧 NEW: Load data với current filters
+function loadDataWithCurrentFilters() {
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(onDataLoaded)
+    .withFailureHandler(onDataError)
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
 }
 
 function refreshData() {
@@ -111,10 +133,12 @@ function refreshData() {
   filterEmployee = '';
   showCompleted = false;
   shiftFilter = 'total';
+  timeFilter = 'all';
   document.getElementById('companySearch').value = '';
   document.getElementById('employeeFilter').value = '';
   document.getElementById('showCompleted').checked = false;
   document.getElementById('shiftFilter').value = 'total';
+  document.getElementById('timeFilter').value = 'all';
   
   google.script.run
     .withSuccessHandler(onRefreshDataLoaded)
@@ -130,15 +154,17 @@ function onDataLoaded(data) {
     return;
   }
   
+  console.log('📊 Data loaded with shiftFilter:', data.summary?.shiftFilter || 'unknown');
+  console.log('📊 Data loaded with timeFilter:', data.summary?.timeFilter || 'all');
+  
   originalData = JSON.parse(JSON.stringify(data)); // Deep clone
   dashboardData = data;
   
   // Update employee filter options
   updateEmployeeFilter(data.employees || []);
   
-  // Apply current filters
-  applyFilters();
-  
+  // 🔧 FIX: Render dashboard trực tiếp với data đã filtered từ server
+  renderDashboard(dashboardData);
   showDashboard();
 }
 
@@ -175,17 +201,17 @@ function updateEmployeeFilter(employees) {
   }
 }
 
-// Filter function - Gửi filter đến server
+// 🔧 FIX: Filter function - Gửi tất cả filters đến server
 function applyFilters() {
   if (!originalData) return;
   
-  // Gọi API server để lấy dữ liệu mới với filter
+  // Gọi API server để lấy dữ liệu mới với tất cả filters
   showLoading();
   
   google.script.run
     .withSuccessHandler(onFilterDataLoaded)
     .withFailureHandler(onDataError)
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter);
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
 }
 
 function onFilterDataLoaded(data) {
@@ -196,121 +222,32 @@ function onFilterDataLoaded(data) {
     return;
   }
   
-  // Cập nhật data hiện tại (không phải deep clone original)
+  console.log('🔄 Filtered data loaded with shiftFilter:', data.summary?.shiftFilter || 'unknown');
+  console.log('🔄 Filtered data loaded with timeFilter:', data.summary?.timeFilter || 'all');
+  
+  // Cập nhật data hiện tại
   dashboardData = data;
   
   renderDashboard(dashboardData);
   showDashboard();
 }
 
-// Check if company is completed (all examination dates are in the past)
-function isCompanyCompleted(row) {
-  const today = new Date();
-  const currentDate = today.getDate();
-  
-  // Check if all examination dates are before today
-  let hasExaminations = false;
-  let allCompleted = true;
-  
-  row.data.forEach((value, index) => {
-    if (value > 0) {
-      hasExaminations = true;
-      const examDate = dashboardData.timeline.dates[index];
-      if (examDate >= currentDate) {
-        allCompleted = false;
-      }
-    }
-  });
-  
-  return hasExaminations && allCompleted;
-}
-
-// Calculate statistics based on filtered data
-function calculateStats(rows) {
-  const today = new Date();
-  const currentDate = today.getDate();
-  
-  let totalCompanies = 0;
-  let completedCompanies = 0;
-  let activeCompanies = 0;
-  let pendingCompanies = 0;
-  let totalPeople = 0;
-  
-  // Calculate total days in the current month for average calculation
-  const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-  
-  // Create a map to store daily totals for the filtered data
-  const dailyTotalsFiltered = {};
-
-  rows.forEach(row => {
-    if (row.isSpacing || row.company === 'TỔNG') return; // Skip spacing and original total row
-    
-    totalCompanies++;
-    
-    let hasExaminations = false;
-    let hasCompletedExams = false;
-    let hasActiveExams = false;
-    let companyTotal = 0;
-    
-    row.data.forEach((value, index) => {
-      if (value > 0) {
-        hasExaminations = true;
-        companyTotal += value;
-        
-        // Accumulate daily totals for filtered data
-        const dayOfMonth = dashboardData.timeline.dates[index]; // Use dates from the original timeline for correct day mapping
-        const dateKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${dayOfMonth.toString().padStart(2, '0')}`;
-        dailyTotalsFiltered[dateKey] = (dailyTotalsFiltered[dateKey] || 0) + value;
-
-        if (dayOfMonth < currentDate) {
-          hasCompletedExams = true;
-        } else if (dayOfMonth >= currentDate) {
-          hasActiveExams = true;
-        }
-      }
-    });
-    
-    totalPeople += companyTotal;
-    
-    if (hasExaminations) {
-      if (hasCompletedExams && !hasActiveExams) {
-        // Company has completed all examinations
-        completedCompanies++;
-      } else if (hasActiveExams) {
-        // Company has ongoing or future examinations
-        activeCompanies++;
-      }
-    }
-  });
-  
-  // Pending companies = Total companies - Completed companies - Active companies
-  pendingCompanies = totalCompanies - completedCompanies - activeCompanies;
-  
-  // Calculate average per day based on filtered daily totals
-  const totalPeopleInFilteredDays = Object.values(dailyTotalsFiltered).reduce((sum, val) => sum + val, 0);
-  const averagePerDay = daysInMonth > 0 ? Math.round(totalPeopleInFilteredDays / daysInMonth) : 0;
-  
-  return {
-    totalCompanies,
-    completedCompanies,
-    activeCompanies,
-    pendingCompanies,
-    totalPeople: totalPeopleInFilteredDays, // Use the sum of filtered daily totals
-    averagePerDay
-  };
-}
-
-function renderDashboard(data) {
-  renderStats(data.summary);
-  renderTimeline(data.timeline);
-}
-
-// Enhanced stats with correct calculations - removed pendingCompanies
+// 🔧 FIX: Calculate statistics based on actual filtered data from server
 function renderStats(summary) {
+  // Sử dụng data từ server thay vì tính toán lại client-side
   document.getElementById('totalCompanies').textContent = formatNumber(summary.totalCompanies || 0);
   document.getElementById('completedCompanies').textContent = formatNumber(summary.completedCompanies || 0);
   document.getElementById('activeCompanies').textContent = formatNumber(summary.activeCompanies || 0);
   document.getElementById('averagePerDay').textContent = formatNumber(summary.averagePerDay || 0);
+  
+  console.log('📊 Stats rendered:', {
+    total: summary.totalCompanies,
+    completed: summary.completedCompanies,
+    active: summary.activeCompanies,
+    avg: summary.averagePerDay,
+    filter: summary.shiftFilter,
+    timeFilter: summary.timeFilter
+  });
 }
 
 function formatNumber(num) {
@@ -361,6 +298,11 @@ function shortenCompanyName(fullName) {
 
 function createTooltip(companyName, date, peopleCount) {
   return `${companyName}\nNgày ${date}: ${peopleCount} người khám`;
+}
+
+function renderDashboard(data) {
+  renderStats(data.summary);
+  renderTimeline(data.timeline);
 }
 
 function renderTimeline(timeline) {
@@ -549,6 +491,31 @@ function renderTimeline(timeline) {
   tbody.appendChild(totalTr);
 }
 
+// Hàm định dạng ngày tháng năm
+function formatDate(dateString) {
+  if (!dateString) return '';
+  
+  // Kiểm tra nếu dateString đã là định dạng dd/mm/yyyy
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+    return dateString;
+  }
+  
+  // Nếu là định dạng ISO hoặc khác
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Trả về nguyên bản nếu không phải ngày hợp lệ
+    
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch (e) {
+    console.error('Lỗi định dạng ngày:', e);
+    return dateString;
+  }
+}
+
 // Modal functions
 function showCompanyDetail(companyName) {
   if (!originalData || !originalData.companyDetails) {
@@ -568,6 +535,11 @@ function showCompanyDetail(companyName) {
   
   modalTitle.textContent = companyName;
   
+  // Định dạng ngày bắt đầu và kết thúc khám
+  const startDate = companyDetail.ngayBatDau || '';
+  const endDate = companyDetail.ngayKetThuc || '';
+  const dateRangeText = startDate && endDate ? `${startDate} - ${endDate}` : 'Chưa có thông tin';
+  
   modalBody.innerHTML = `
     <div class="detail-row">
       <span class="detail-label">Số lượng khám sáng:</span>
@@ -584,6 +556,10 @@ function showCompanyDetail(companyName) {
     <div class="detail-row">
       <span class="detail-label">Tổng số ngày khám:</span>
       <span class="detail-value">${companyDetail.tongSoNgay || 0}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Khoảng thời gian khám:</span>
+      <span class="detail-value">${dateRangeText}</span>
     </div>
     ${companyDetail.employee ? `
     <div class="detail-row">
@@ -602,7 +578,7 @@ function showTotalDetail() {
     return;
   }
   
-  // Tính tổng sáng/chiều từ tất cả công ty hiện đang hiển thị
+  // 🔧 FIX: Tính tổng dựa trên companies đang hiển thị và current shiftFilter
   let totalSang = 0;
   let totalChieu = 0;
   let totalNguoi = 0;
@@ -625,7 +601,25 @@ function showTotalDetail() {
   const modalTitle = document.getElementById('modalTitle');
   const modalBody = document.getElementById('modalBody');
   
-  modalTitle.textContent = 'Tổng hợp tất cả công ty';
+  // 🔧 FIX: Display title theo current filter
+  let titleText = 'Tổng hợp tất cả công ty';
+  if (shiftFilter === 'sang' || shiftFilter === 'morning') {
+    titleText += ' (Ca sáng)';
+  } else if (shiftFilter === 'chieu' || shiftFilter === 'afternoon') {
+    titleText += ' (Ca chiều)';
+  }
+  
+  // Thêm thông tin về time filter
+  if (timeFilter !== 'all') {
+    const timeFilterText = timeFilter === 'today' ? 'Hôm nay' : 
+                          timeFilter === 'week' ? 'Tuần này' : 
+                          timeFilter === 'month' ? 'Tháng này' : '';
+    if (timeFilterText) {
+      titleText += ` - ${timeFilterText}`;
+    }
+  }
+  
+  modalTitle.textContent = titleText;
   
   modalBody.innerHTML = `
     <div class="detail-row">
@@ -639,6 +633,16 @@ function showTotalDetail() {
     <div class="detail-row">
       <span class="detail-label">Tổng số người khám:</span>
       <span class="detail-value">${totalNguoi}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Filter hiện tại:</span>
+      <span class="detail-value">${shiftFilter === 'total' ? 'Tổng' : shiftFilter === 'sang' ? 'Sáng' : 'Chiều'}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Thời gian hiện tại:</span>
+      <span class="detail-value">${timeFilter === 'all' ? 'Tất cả' : 
+                                  timeFilter === 'today' ? 'Hôm nay' : 
+                                  timeFilter === 'week' ? 'Tuần này' : 'Tháng này'}</span>
     </div>
   `;
   

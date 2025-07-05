@@ -399,90 +399,76 @@ function calculateFilteredStats(timeline, shiftFilter) {
 }
 
 /**
- * Tạo timeline data với sắp xếp theo tổng số ngày khám (nhiều nhất ở dưới)
+ * Tạo dữ liệu timeline cho tháng hiện tại
  */
-function createTimelineData(companySchedules, dailyTotals, companyTotals, month, year, companyEmployees) {
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const timeline = [];
-  
-  // Tạo dates với thứ
+function createTimelineData(companySchedules, dailyTotals, companyTotals, targetMonth, targetYear, companyEmployees) {
+  const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
   const dates = [];
   const weekdays = [];
   
+  // Tạo mảng ngày và thứ trong tháng
   for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month - 1, day);
+    const date = new Date(targetYear, targetMonth - 1, day);
     const weekday = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][date.getDay()];
     
     dates.push(day);
     weekdays.push(weekday);
   }
   
-  // Sắp xếp công ty theo tổng số người khám (ít nhất ở trên, nhiều nhất ở dưới)
-  const sortedCompanies = Object.keys(companySchedules).sort((a, b) => {
-    return (companyTotals[a] || 0) - (companyTotals[b] || 0);
-  });
+  // Tạo dữ liệu cho từng công ty
+  const rows = [];
   
-  sortedCompanies.forEach(companyName => {
+  Object.keys(companySchedules).sort().forEach(companyName => {
+    const companyData = companySchedules[companyName];
     const row = {
       company: companyName,
+      total: companyTotals[companyName] || 0,
       employee: companyEmployees[companyName] || '',
-      data: [],
-      total: companyTotals[companyName] || 0
+      data: []
     };
     
+    // Điền dữ liệu cho từng ngày
     for (let day = 1; day <= daysInMonth; day++) {
-      const dateKey = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-      const peopleCount = companySchedules[companyName][dateKey] || 0;
-      row.data.push(peopleCount);
+      const date = new Date(targetYear, targetMonth - 1, day);
+      const dateKey = formatDateKey(date);
+      row.data.push(companyData[dateKey] || 0);
     }
     
-    timeline.push(row);
+    rows.push(row);
   });
   
   return {
     dates: dates,
     weekdays: weekdays,
-    rows: timeline
+    rows: rows
   };
 }
 
-// Lấy danh sách nhân viên
-function getEmployeeList() {
-  try {
-    const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
-    const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-    const range = sheet.getDataRange();
-    const values = range.getValues();
-    
-    const headers = values[0];
-    const columnIndexes = getColumnIndexes(headers);
-    
-    const employees = new Set();
-    
-    values.slice(1).forEach(row => {
-      if (columnIndexes.tenNhanVien && row[columnIndexes.tenNhanVien]) {
-        employees.add(row[columnIndexes.tenNhanVien].trim());
-      }
-    });
-    
-    return Array.from(employees).sort();
-    
-  } catch (error) {
-    console.error('Lỗi lấy danh sách nhân viên:', error);
-    return [];
-  }
+/**
+ * Lấy danh sách nhân viên từ dữ liệu
+ */
+function getEmployeeList(data) {
+  const employees = new Set();
+  
+  data.forEach(record => {
+    if (record.tenNhanVien) {
+      employees.add(record.tenNhanVien.trim());
+    }
+  });
+  
+  return Array.from(employees).sort();
 }
 
 /**
- * Tính tổng số nhân viên sáng/chiều cho tất cả công ty
+ * Tính tổng số ca sáng/chiều
  */
-function calculateTotalShifts(companyDetails) {
+function calculateTotalShifts(data) {
   let totalSang = 0;
   let totalChieu = 0;
   
-  Object.values(companyDetails).forEach(detail => {
-    totalSang += detail.sang || 0;
-    totalChieu += detail.chieu || 0;
+  data.forEach(record => {
+    totalSang += parseInt(record.sang) || 0;
+    totalChieu += parseInt(record.chieu) || 0;
   });
   
   return {
