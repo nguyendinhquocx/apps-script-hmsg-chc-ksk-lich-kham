@@ -342,24 +342,36 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       }
     });
   }
-  
+
   // Áp dụng time filter (ngày, tuần, tháng)
   const filteredCompanySchedules = applyTimeFilter(companySchedules, timeFilter);
-  
+
   const timeline = createTimelineData(filteredCompanySchedules, dailyTotals, companyTotals, targetMonth, targetYear, companyEmployees);
-  
+
   // 🔧 FIX: Tính lại statistics dựa trên filtered data
   const filteredStats = calculateFilteredStats(timeline, shiftFilter);
   
+  // 🔧 FIX: Tính lại statusCounts dựa trên filtered companies để tránh số âm
+  const filteredStatusCounts = { completed: 0, pending: 0 };
+  Object.keys(filteredCompanySchedules).forEach(companyName => {
+    const status = companyStatus[companyName] || '';
+    const statusLower = status.toLowerCase().trim();
+    if (statusLower === 'đã khám xong' || statusLower === 'da kham xong') {
+      filteredStatusCounts.completed++;
+    } else {
+      filteredStatusCounts.pending++;
+    }
+  });
+
   return {
     success: true,
     timeline: timeline,
     companyDetails: companyDetails,
     summary: {
-      totalCompanies: Object.keys(companySchedules).length,
-      completedCompanies: statusCounts.completed,
-      pendingCompanies: statusCounts.pending,
-      activeCompanies: Object.keys(companySchedules).length - statusCounts.completed,
+      totalCompanies: Object.keys(filteredCompanySchedules).length,
+      completedCompanies: filteredStatusCounts.completed,
+      pendingCompanies: filteredStatusCounts.pending,
+      activeCompanies: filteredStatusCounts.pending, // Công ty đang khám = pending companies
       currentMonth: targetMonth,
       currentYear: targetYear,
       maxPeoplePerDay: filteredStats.maxPeoplePerDay,
