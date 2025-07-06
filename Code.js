@@ -1,7 +1,7 @@
 /**
  * Lịch khám sức khoẻ công ty - HMSG CHC QUOC
  * Phiên bản 2.5 - Fix UI dropdown styling + Cross-month logic
- * Tác giả: System Auto-generated
+ * Tác giả: Quoc Nguyen
  * Ngày: 2025-07-05
  */
 
