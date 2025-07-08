@@ -123,6 +123,9 @@ function loadDataWithCurrentFilters() {
     .withSuccessHandler(onDataLoaded)
     .withFailureHandler(onDataError)
     .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+  
+  // Cũng tải dữ liệu cận lâm sàng
+  loadClinicalData();
 }
 
 function refreshData() {
@@ -230,6 +233,9 @@ function onFilterDataLoaded(data) {
   
   renderDashboard(dashboardData);
   showDashboard();
+  
+  // Cũng tải lại dữ liệu cận lâm sàng
+  loadClinicalData();
 }
 
 // Calculate statistics based on actual filtered data from server
@@ -914,4 +920,146 @@ setInterval(() => {
     loadData();
   }
 }, 5 * 60 * 1000);
+
+// Clinical Examination Table Functions
+function loadClinicalData() {
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(onClinicalDataLoaded)
+    .withFailureHandler(onDataError)
+    .getClinicalData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+}
+
+function onClinicalDataLoaded(data) {
+  hideLoading();
+  
+  if (!data.success) {
+    showError(data.error || 'Có lỗi xảy ra khi tải dữ liệu cận lâm sàng');
+    return;
+  }
+  
+  renderClinicalTable(data);
+}
+
+function renderClinicalTable(clinicalData = null) {
+  // Nếu không có data được truyền vào, load data mới
+  if (!clinicalData) {
+    loadClinicalData();
+    return;
+  }
+  
+  if (!clinicalData.data || clinicalData.data.length === 0) {
+    const clinicalContainer = document.querySelector('.clinical-container');
+    if (clinicalContainer) {
+      clinicalContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: #64748b;">Không có dữ liệu cận lâm sàng</div>';
+    }
+    return;
+  }
+  
+  // Sử dụng dữ liệu đã được xử lý từ server
+  const data = clinicalData.data;
+  const columns = clinicalData.columns;
+
+  // Tính tổng cho từng cột
+  const totals = {};
+  columns.forEach(col => {
+    totals[col.key] = data.reduce((sum, row) => sum + (row[col.key] || 0), 0);
+  });
+
+  // Tạo HTML cho bảng theo thứ tự cột đã định nghĩa
+  let tableHTML = `
+    <table class="clinical-table" id="clinicalTable">
+      <thead>
+        <tr class="clinical-header-row">
+          <th class="clinical-header company-header">Công ty</th>
+          <th class="clinical-header people-header">Người</th>
+  `;
+  
+  // Thêm header cho các cột cận lâm sàng theo thứ tự đã định nghĩa
+  columns.forEach(col => {
+    tableHTML += `<th class="clinical-header">${col.label}</th>`;
+  });
+  
+  tableHTML += `
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  // Tạo các hàng dữ liệu
+  data.forEach(row => {
+    tableHTML += `
+      <tr class="clinical-row">
+        <td class="clinical-data-cell company-cell clickable" onclick="showCompanyDetail('${row.company}')">
+          ${shortenCompanyName(row.company)}
+        </td>
+        <td class="clinical-data-cell people-cell">${row.employee}</td>
+    `;
+    
+    columns.forEach(col => {
+      const value = row[col.key] || 0;
+      const cellClass = value > 0 ? 'has-data' : 'empty';
+      tableHTML += `
+        <td class="clinical-data-cell ${cellClass}">
+          <div class="clinical-data-inner">${value > 0 ? value : ''}</div>
+        </td>
+      `;
+    });
+    
+    tableHTML += `</tr>`;
+  });
+
+  // Thêm hàng tổng
+  if (data.length > 0) {
+    tableHTML += `
+      <tr class="clinical-total-row">
+        <td class="clinical-data-cell company-cell">TỔNG</td>
+        <td class="clinical-data-cell people-cell">${data.length}</td>
+    `;
+    
+    columns.forEach(col => {
+      const total = totals[col.key] || 0;
+      tableHTML += `
+        <td class="clinical-data-cell">
+          <div class="clinical-data-inner">${total}</div>
+        </td>
+      `;
+    });
+    
+    tableHTML += `</tr>`;
+  }
+
+  tableHTML += `
+      </tbody>
+    </table>
+  `;
+
+  // Cập nhật DOM
+  const clinicalContainer = document.querySelector('.clinical-container');
+  if (clinicalContainer) {
+    clinicalContainer.innerHTML = tableHTML;
+  }
+}
+
+// Cập nhật hàm renderDashboard để bao gồm bảng cận lâm sàng
+const originalRenderDashboard = renderDashboard;
+renderDashboard = function(data) {
+  // Gọi hàm render dashboard gốc
+  originalRenderDashboard(data);
+  
+  // Render bảng cận lâm sàng
+  renderClinicalTable();
+};
+
+// Cập nhật hàm applyFilters để cập nhật cả bảng cận lâm sàng
+const originalApplyFilters = applyFilters;
+applyFilters = function() {
+  // Gọi hàm apply filters gốc
+  originalApplyFilters();
+  
+  // Cập nhật bảng cận lâm sàng
+  renderClinicalTable();
+};
+
 </script>

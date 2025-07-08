@@ -67,7 +67,13 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
     const rawData = values.slice(1).map(row => {
       const record = {};
       Object.keys(columnIndexes).forEach(key => {
-        record[key] = row[columnIndexes[key]] || '';
+        const value = row[columnIndexes[key]];
+        // Chuyển đổi số cho các cột cận lâm sàng
+        if (key.includes('sieuAm') || key.includes('khamPhuKhoa') || key.includes('xQuang') || key.includes('dienTamDo')) {
+          record[key] = parseInt(value) || 0;
+        } else {
+          record[key] = value || '';
+        }
       });
       return record;
     });
@@ -115,7 +121,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
 }
 
 /**
- * Tìm index của các cột - bổ sung cột tên nhân viên
+ * Tìm index của các cột - bổ sung cột tên nhân viên và cận lâm sàng
  */
 function getColumnIndexes(headers) {
   const requiredColumns = {
@@ -128,7 +134,27 @@ function getColumnIndexes(headers) {
     'chieu': ['trung binh ngay chieu', 'chiều'],
     'soNguoiKham': ['so nguoi kham', 'số người khám'],
     'trangThaiKham': ['trang thai kham', 'trạng thái khám'],
-    'tenNhanVien': ['ten nhan vien', 'tên nhân viên']
+    'tenNhanVien': ['ten nhan vien', 'tên nhân viên'],
+    // Cận lâm sàng - Sáng
+    'sieuAmBungSang': ['sieu am bung sang'],
+    'khamPhuKhoaSang': ['kham phu khoa sang'],
+    'xQuangSang': ['x quang sang'],
+    'dienTamDoSang': ['dien tam do sang'],
+    'sieuAmVuSang': ['sieu am vu sang'],
+    'sieuAmGiapSang': ['sieu am giap sang'],
+    'sieuAmTimSang': ['sieu am tim sang'],
+    'sieuAmDongMachCanhSang': ['sieu am dong mach canh sang'],
+    'sieuAmDanHoiMoGanSang': ['sieu am dan hoi mo gan sang'],
+    // Cận lâm sàng - Chiều
+    'sieuAmBungChieu': ['sieu am bung chieu'],
+    'khamPhuKhoaChieu': ['kham phu khoa chieu'],
+    'xQuangChieu': ['x quang chieu'],
+    'dienTamDoChieu': ['dien tam do chieu'],
+    'sieuAmVuChieu': ['sieu am vu chieu'],
+    'sieuAmGiapChieu': ['sieu am giap chieu'],
+    'sieuAmTimChieu': ['sieu am tim chieu'],
+    'sieuAmDongMachCanhChieu': ['sieu am dong mach canh chieu'],
+    'sieuAmDanHoiMoGanChieu': ['sieu am dan hoi mo gan chieu']
   };
   
   const indexes = {};
@@ -144,7 +170,9 @@ function getColumnIndexes(headers) {
       if (foundIndex !== -1) break;
     }
     
-    if (foundIndex === -1 && !['trangThaiKham', 'tenNhanVien'].includes(key)) {
+    // Chỉ bắt buộc các cột cơ bản, cận lâm sàng là optional
+    const requiredFields = ['tenCongTy', 'ngayBatDau', 'ngayKetThuc', 'tongSoNgayKham', 'trungBinhNgay', 'sang', 'chieu', 'soNguoiKham'];
+    if (foundIndex === -1 && requiredFields.includes(key)) {
       throw new Error(`Không tìm thấy cột '${possibleNames[0]}'`);
     }
     
@@ -232,7 +260,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     // Lưu trạng thái công ty và thông tin sáng/chiều
     companyStatus[companyName] = trangThaiKham;
     
-    // Cập nhật thông tin sáng/chiều
+    // Cập nhật thông tin sáng/chiều và cận lâm sàng
     if (!companyDetails[companyName]) {
       companyDetails[companyName] = {
         sang: 0,
@@ -241,7 +269,27 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
         tongSoNgay: 0,
         employee: record.tenNhanVien ? record.tenNhanVien.trim() : '',
         ngayBatDau: formatDate(record.ngayBatDau),
-        ngayKetThuc: formatDate(record.ngayKetThuc)
+        ngayKetThuc: formatDate(record.ngayKetThuc),
+        // Cận lâm sàng - Sáng
+        sieuAmBungSang: 0,
+        khamPhuKhoaSang: 0,
+        xQuangSang: 0,
+        dienTamDoSang: 0,
+        sieuAmVuSang: 0,
+        sieuAmGiapSang: 0,
+        sieuAmTimSang: 0,
+        sieuAmDongMachCanhSang: 0,
+        sieuAmDanHoiMoGanSang: 0,
+        // Cận lâm sàng - Chiều
+        sieuAmBungChieu: 0,
+        khamPhuKhoaChieu: 0,
+        xQuangChieu: 0,
+        dienTamDoChieu: 0,
+        sieuAmVuChieu: 0,
+        sieuAmGiapChieu: 0,
+        sieuAmTimChieu: 0,
+        sieuAmDongMachCanhChieu: 0,
+        sieuAmDanHoiMoGanChieu: 0
       };
     }
     
@@ -249,6 +297,20 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     companyDetails[companyName].chieu += chieu;
     companyDetails[companyName].tongNguoi += soNguoiKham;
     companyDetails[companyName].tongSoNgay += tongSoNgayKham;
+    
+    // Cập nhật dữ liệu cận lâm sàng
+    const clinicalFields = [
+      'sieuAmBungSang', 'khamPhuKhoaSang', 'xQuangSang', 'dienTamDoSang',
+      'sieuAmVuSang', 'sieuAmGiapSang', 'sieuAmTimSang', 'sieuAmDongMachCanhSang', 'sieuAmDanHoiMoGanSang',
+      'sieuAmBungChieu', 'khamPhuKhoaChieu', 'xQuangChieu', 'dienTamDoChieu',
+      'sieuAmVuChieu', 'sieuAmGiapChieu', 'sieuAmTimChieu', 'sieuAmDongMachCanhChieu', 'sieuAmDanHoiMoGanChieu'
+    ];
+    
+    clinicalFields.forEach(field => {
+      if (record[field] !== undefined) {
+        companyDetails[companyName][field] += record[field];
+      }
+    });
     
     if (!companyDetails[companyName].employee && record.tenNhanVien) {
       companyDetails[companyName].employee = record.tenNhanVien.trim();
@@ -681,6 +743,103 @@ function getCurrentUser() {
     email: Session.getActiveUser().getEmail(),
     name: Session.getActiveUser().getUsername() || 'User'
   };
+}
+
+/**
+ * Lấy dữ liệu cận lâm sàng cho bảng hiển thị
+ */
+function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all') {
+  try {
+    const scheduleData = getScheduleData(month, year, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+    
+    if (!scheduleData.success) {
+      return scheduleData;
+    }
+    
+    const clinicalData = [];
+    const companyDetails = scheduleData.companyDetails || {};
+    
+    // Định nghĩa thứ tự cột theo ảnh người dùng gửi
+    const clinicalColumns = [
+      { key: 'tongSieuAmSang', label: 'Tổng siêu âm sáng' },
+      { key: 'khamPhuKhoaSang', label: 'Khám phụ khoa sáng' },
+      { key: 'xQuangSang', label: 'X-quang sáng' },
+      { key: 'dienTamDoSang', label: 'Điện tâm đồ sáng' },
+      { key: 'sieuAmBungSang', label: 'Siêu âm bụng sáng' },
+      { key: 'sieuAmVuSang', label: 'Siêu âm vú sáng' },
+      { key: 'sieuAmGiapSang', label: 'Siêu âm giáp sáng' },
+      { key: 'sieuAmTimSang', label: 'Siêu âm tim sáng' },
+      { key: 'sieuAmDongMachCanhSang', label: 'Siêu âm động mạch cảnh sáng' },
+      { key: 'sieuAmDanHoiMoGanSang', label: 'Siêu âm đàn hồi mô gan sáng' },
+      { key: 'tongSieuAmChieu', label: 'Tổng siêu âm chiều' },
+      { key: 'khamPhuKhoaChieu', label: 'Khám phụ khoa chiều' },
+      { key: 'xQuangChieu', label: 'X-quang chiều' },
+      { key: 'dienTamDoChieu', label: 'Điện tâm đồ chiều' },
+      { key: 'sieuAmBungChieu', label: 'Siêu âm bụng chiều' },
+      { key: 'sieuAmVuChieu', label: 'Siêu âm vú chiều' },
+      { key: 'sieuAmGiapChieu', label: 'Siêu âm giáp chiều' },
+      { key: 'sieuAmTimChieu', label: 'Siêu âm tim chiều' },
+      { key: 'sieuAmDongMachCanhChieu', label: 'Siêu âm động mạch cảnh chiều' },
+      { key: 'sieuAmDanHoiMoGanChieu', label: 'Siêu âm đàn hồi mô gan chiều' }
+    ];
+    
+    // Xử lý dữ liệu cho từng công ty
+    Object.keys(companyDetails).forEach(companyName => {
+      const details = companyDetails[companyName];
+      
+      const clinicalRow = {
+        company: companyName,
+        employee: details.employee || '',
+        // Tính tổng siêu âm
+        tongSieuAmSang: (details.sieuAmBungSang || 0) + (details.sieuAmVuSang || 0) + 
+                       (details.sieuAmGiapSang || 0) + (details.sieuAmTimSang || 0) + 
+                       (details.sieuAmDongMachCanhSang || 0) + (details.sieuAmDanHoiMoGanSang || 0),
+        tongSieuAmChieu: (details.sieuAmBungChieu || 0) + (details.sieuAmVuChieu || 0) + 
+                        (details.sieuAmGiapChieu || 0) + (details.sieuAmTimChieu || 0) + 
+                        (details.sieuAmDongMachCanhChieu || 0) + (details.sieuAmDanHoiMoGanChieu || 0),
+        // Các cột cận lâm sàng khác
+        khamPhuKhoaSang: details.khamPhuKhoaSang || 0,
+        xQuangSang: details.xQuangSang || 0,
+        dienTamDoSang: details.dienTamDoSang || 0,
+        sieuAmBungSang: details.sieuAmBungSang || 0,
+        sieuAmVuSang: details.sieuAmVuSang || 0,
+        sieuAmGiapSang: details.sieuAmGiapSang || 0,
+        sieuAmTimSang: details.sieuAmTimSang || 0,
+        sieuAmDongMachCanhSang: details.sieuAmDongMachCanhSang || 0,
+        sieuAmDanHoiMoGanSang: details.sieuAmDanHoiMoGanSang || 0,
+        khamPhuKhoaChieu: details.khamPhuKhoaChieu || 0,
+        xQuangChieu: details.xQuangChieu || 0,
+        dienTamDoChieu: details.dienTamDoChieu || 0,
+        sieuAmBungChieu: details.sieuAmBungChieu || 0,
+        sieuAmVuChieu: details.sieuAmVuChieu || 0,
+        sieuAmGiapChieu: details.sieuAmGiapChieu || 0,
+        sieuAmTimChieu: details.sieuAmTimChieu || 0,
+        sieuAmDongMachCanhChieu: details.sieuAmDongMachCanhChieu || 0,
+        sieuAmDanHoiMoGanChieu: details.sieuAmDanHoiMoGanChieu || 0
+      };
+      
+      clinicalData.push(clinicalRow);
+    });
+    
+    // Sắp xếp theo tên công ty
+    clinicalData.sort((a, b) => a.company.localeCompare(b.company, 'vi'));
+    
+    return {
+      success: true,
+      data: clinicalData,
+      columns: clinicalColumns,
+      summary: scheduleData.summary
+    };
+    
+  } catch (error) {
+    console.error('Lỗi khi lấy dữ liệu cận lâm sàng:', error);
+    return {
+      success: false,
+      error: error.message,
+      data: [],
+      columns: []
+    };
+  }
 }
 
 function testConnection() {
