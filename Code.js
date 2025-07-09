@@ -337,22 +337,28 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     
     if (actualWorkingDaysInMonth.length === 0) return;
     
-    // 🔧 FIX: Logic ĐÚNG tính số người khám dựa trên số ngày THỰC TẾ trong target month
-    let peoplePerDay = 0;
+    // 🔧 FIX: Logic ĐÚNG - hiển thị tổng số người khám trong cả giai đoạn, không phải mỗi ngày
+    let totalPeopleForPeriod = 0;
     
     if (shiftFilter === 'morning' || shiftFilter === 'sang') {
-      peoplePerDay = sang; // Số người sáng mỗi ngày
-      console.log(`🌅 Sáng - Company: ${companyName}, Per day: ${sang}, Days in month: ${actualWorkingDaysInMonth.length}`);
+      // Tổng số người sáng trong cả giai đoạn = số người sáng mỗi ngày × số ngày khám trong tháng
+      totalPeopleForPeriod = sang * actualWorkingDaysInMonth.length;
+      console.log(`🌅 Sáng - Company: ${companyName}, Per day: ${sang}, Days: ${actualWorkingDaysInMonth.length}, Total: ${totalPeopleForPeriod}`);
     } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
-      peoplePerDay = chieu; // Số người chiều mỗi ngày  
-      console.log(`🌆 Chiều - Company: ${companyName}, Per day: ${chieu}, Days in month: ${actualWorkingDaysInMonth.length}`);
+      // Tổng số người chiều trong cả giai đoạn = số người chiều mỗi ngày × số ngày khám trong tháng
+      totalPeopleForPeriod = chieu * actualWorkingDaysInMonth.length;
+      console.log(`🌆 Chiều - Company: ${companyName}, Per day: ${chieu}, Days: ${actualWorkingDaysInMonth.length}, Total: ${totalPeopleForPeriod}`);
     } else {
-      // Tổng: Tính trung bình người/ngày trong toàn bộ thời gian khám
-      peoplePerDay = Math.ceil(soNguoiKham / tongSoNgayKham);
-      console.log(`📊 Tổng - Company: ${companyName}, Total: ${soNguoiKham}, Per day: ${peoplePerDay}, Days in month: ${actualWorkingDaysInMonth.length}`);
+      // Tổng: Hiển thị tổng số người khám trong cả giai đoạn (không phải mỗi ngày)
+      // Tính số người khám trong tháng target dựa trên tỷ lệ ngày khám
+      const ratioInTargetMonth = actualWorkingDaysInMonth.length / tongSoNgayKham;
+      totalPeopleForPeriod = Math.ceil(soNguoiKham * ratioInTargetMonth);
+      console.log(`📊 Tổng - Company: ${companyName}, Total people: ${soNguoiKham}, Days in month: ${actualWorkingDaysInMonth.length}, Total days: ${tongSoNgayKham}, Period total: ${totalPeopleForPeriod}`);
     }
     
-    // 🔧 FIX: Phân bổ người khám chỉ cho các ngày trong target month
+    // Phân bổ đều số người khám cho các ngày trong target month để hiển thị
+    const peoplePerDay = actualWorkingDaysInMonth.length > 0 ? Math.ceil(totalPeopleForPeriod / actualWorkingDaysInMonth.length) : 0;
+    
     actualWorkingDaysInMonth.forEach(workDate => {
       const dateKey = formatDateKey(workDate);
       
@@ -362,9 +368,11 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
           (companySchedules[companyName][dateKey] || 0) + peoplePerDay;
         
         dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peoplePerDay;
-        companyTotals[companyName] = (companyTotals[companyName] || 0) + peoplePerDay;
       }
     });
+    
+    // Cập nhật tổng công ty với tổng số người trong cả giai đoạn
+    companyTotals[companyName] = (companyTotals[companyName] || 0) + totalPeopleForPeriod;
   });
   
   // Tính thống kê trạng thái
@@ -750,7 +758,7 @@ function getCurrentUser() {
  */
 function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all') {
   try {
-    // Luôn lọc theo tháng và chỉ hiển thị công ty chưa khám xong
+    // Lấy dữ liệu với showCompleted = false để chỉ hiển thị công ty chưa khám xong
     const scheduleData = getScheduleData(month, year, false, searchCompany, filterEmployee, shiftFilter, timeFilter);
     
     if (!scheduleData.success) {
@@ -760,9 +768,8 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
     const clinicalData = [];
     const companyDetails = scheduleData.companyDetails || {};
     
-    // Định nghĩa thứ tự cột theo ảnh người dùng gửi
+    // Định nghĩa thứ tự cột theo yêu cầu (bỏ tổng siêu âm sáng và chiều)
     const clinicalColumns = [
-      { key: 'tongSieuAmSang', label: 'Tổng siêu âm sáng' },
       { key: 'khamPhuKhoaSang', label: 'Khám phụ khoa sáng' },
       { key: 'xQuangSang', label: 'X-quang sáng' },
       { key: 'dienTamDoSang', label: 'Điện tâm đồ sáng' },
@@ -772,7 +779,6 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
       { key: 'sieuAmTimSang', label: 'Siêu âm tim sáng' },
       { key: 'sieuAmDongMachCanhSang', label: 'Siêu âm động mạch cảnh sáng' },
       { key: 'sieuAmDanHoiMoGanSang', label: 'Siêu âm đàn hồi mô gan sáng' },
-      { key: 'tongSieuAmChieu', label: 'Tổng siêu âm chiều' },
       { key: 'khamPhuKhoaChieu', label: 'Khám phụ khoa chiều' },
       { key: 'xQuangChieu', label: 'X-quang chiều' },
       { key: 'dienTamDoChieu', label: 'Điện tâm đồ chiều' },
@@ -784,21 +790,14 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
       { key: 'sieuAmDanHoiMoGanChieu', label: 'Siêu âm đàn hồi mô gan chiều' }
     ];
     
-    // Xử lý dữ liệu cho từng công ty
+    // Xử lý dữ liệu cho từng công ty (scheduleData đã lọc công ty chưa khám xong)
     Object.keys(companyDetails).forEach(companyName => {
       const details = companyDetails[companyName];
       
       const clinicalRow = {
         company: companyName,
-        employee: details.totalPeople || 0,
-        // Tính tổng siêu âm
-        tongSieuAmSang: (details.sieuAmBungSang || 0) + (details.sieuAmVuSang || 0) + 
-                       (details.sieuAmGiapSang || 0) + (details.sieuAmTimSang || 0) + 
-                       (details.sieuAmDongMachCanhSang || 0) + (details.sieuAmDanHoiMoGanSang || 0),
-        tongSieuAmChieu: (details.sieuAmBungChieu || 0) + (details.sieuAmVuChieu || 0) + 
-                        (details.sieuAmGiapChieu || 0) + (details.sieuAmTimChieu || 0) + 
-                        (details.sieuAmDongMachCanhChieu || 0) + (details.sieuAmDanHoiMoGanChieu || 0),
-        // Các cột cận lâm sàng khác
+        employee: details.tongNguoi || 0,
+        // Các cột cận lâm sàng (bỏ tổng siêu âm)
         khamPhuKhoaSang: details.khamPhuKhoaSang || 0,
         xQuangSang: details.xQuangSang || 0,
         dienTamDoSang: details.dienTamDoSang || 0,

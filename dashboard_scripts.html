@@ -956,13 +956,13 @@ function renderClinicalTable(clinicalData = null) {
   let tableHTML = `
     <table class="clinical-table" id="clinicalTable">
       <thead>
-        <tr class="clinical-header-row">
+        <tr class="clinical-header-row clinical-header-main">
           <th class="clinical-header company-header" rowspan="2">Công ty</th>
           <th class="clinical-header people-header" rowspan="2">Người</th>
-          <th class="clinical-header" colspan="10">Sáng</th>
+          <th class="clinical-header" colspan="10" style="border-right: 2px solid #2563eb;">Sáng</th>
           <th class="clinical-header" colspan="10">Chiều</th>
         </tr>
-        <tr class="clinical-header-row">
+        <tr class="clinical-header-row clinical-header-sub">
   `;
   
   // Thêm header cho các cột cận lâm sàng theo thứ tự đã định nghĩa
@@ -994,7 +994,7 @@ function renderClinicalTable(clinicalData = null) {
       const total = totals[col.key] || 0;
       const cellClass = total > 100 ? 'high-volume' : (total > 0 ? 'has-data' : 'empty');
       tableHTML += `
-        <td class="clinical-data-cell ${cellClass}" onclick="showClinicalColumnDetail('${col.key}', '${col.label}')">
+        <td class="clinical-data-cell ${cellClass} clickable" onclick="showClinicalColumnDetail('${col.key}', '${col.label}')">
           <div class="clinical-data-inner">${total > 0 ? total : ''}</div>
         </td>
       `;
@@ -1060,6 +1060,51 @@ renderDashboard = function(data) {
   renderClinicalTable();
 };
 
+// Hàm hiển thị chi tiết tổng cận lâm sàng
+function showTotalDetail() {
+  if (!clinicalData || !clinicalData.data) {
+    alert('Không có dữ liệu để hiển thị');
+    return;
+  }
+  
+  const data = clinicalData.data;
+  const totalPeople = data.reduce((sum, row) => sum + (row.employee || 0), 0);
+  
+  // Sắp xếp theo số người giảm dần
+  const sortedData = [...data].sort((a, b) => (b.employee || 0) - (a.employee || 0));
+  
+  let detailHTML = `
+    <div class="modal-header">
+      <h3>Chi tiết tổng cận lâm sàng</h3>
+      <span class="close" onclick="closeDetailModal()">&times;</span>
+    </div>
+    <div class="modal-content">
+      <div class="detail-summary">
+        <p><strong>Tổng số công ty:</strong> ${data.length}</p>
+        <p><strong>Tổng số người:</strong> ${totalPeople}</p>
+      </div>
+      <div class="company-list">
+  `;
+  
+  sortedData.forEach(row => {
+    const count = row.employee || 0;
+    detailHTML += `
+      <div class="company-item" onclick="showCompanyDetail('${row.company}')">
+        <span class="company-name">${shortenCompanyName(row.company)}</span>
+        <span class="company-count ${count > 100 ? 'high-volume' : 'normal'}">${count}</span>
+      </div>
+    `;
+  });
+  
+  detailHTML += `
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('modalContent').innerHTML = detailHTML;
+  document.getElementById('detailModal').style.display = 'block';
+}
+
 // Hàm hiển thị chi tiết cột cận lâm sàng
 function showClinicalColumnDetail(columnKey, columnLabel) {
   if (!clinicalData || !clinicalData.data) {
@@ -1081,7 +1126,7 @@ function showClinicalColumnDetail(columnKey, columnLabel) {
   let detailHTML = `
     <div class="modal-header">
       <h3>Chi tiết ${columnLabel}</h3>
-      <span class="close" onclick="closeModal()">&times;</span>
+      <span class="close" onclick="closeDetailModal()">&times;</span>
     </div>
     <div class="modal-content">
       <div class="detail-summary">
