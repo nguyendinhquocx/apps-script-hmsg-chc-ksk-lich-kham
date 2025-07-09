@@ -9,6 +9,7 @@ let shiftFilter = 'total'; // Mặc định là Tổng
 let timeFilter = 'all'; // Mặc định là Tất cả thời gian
 let dashboardData = null;
 let originalData = null; // Keep original unfiltered data
+let clinicalData = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -204,18 +205,7 @@ function updateEmployeeFilter(employees) {
   }
 }
 
-// Filter function - Gửi tất cả filters đến server
-function applyFilters() {
-  if (!originalData) return;
-  
-  // Gọi API server để lấy dữ liệu mới với tất cả filters
-  showLoading();
-  
-  google.script.run
-    .withSuccessHandler(onFilterDataLoaded)
-    .withFailureHandler(onDataError)
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
-}
+// Filter function đã được định nghĩa lại ở cuối file
 
 function onFilterDataLoaded(data) {
   hideLoading();
@@ -233,9 +223,6 @@ function onFilterDataLoaded(data) {
   
   renderDashboard(dashboardData);
   showDashboard();
-  
-  // Cũng tải lại dữ liệu cận lâm sàng
-  loadClinicalData();
 }
 
 // Calculate statistics based on actual filtered data from server
@@ -368,6 +355,68 @@ function renderTimeline(timeline) {
     dateRow.appendChild(dateTh);
   });
   
+  // Sắp xếp các hàng theo số người giảm dần
+  timeline.rows.sort((a, b) => b.total - a.total);
+  
+  // Calculate daily totals for the currently displayed companies
+  const dailyTotalsFiltered = new Array(timeline.dates.length).fill(0);
+  timeline.rows.forEach(row => {
+    row.data.forEach((value, index) => {
+      dailyTotalsFiltered[index] += value;
+    });
+  });
+
+  // Add total row first
+  const totalTr = document.createElement('tr');
+  totalTr.classList.add('total-row', 'clickable');
+
+  const totalCompanyCell = document.createElement('td');
+  totalCompanyCell.classList.add('company-cell');
+  totalCompanyCell.textContent = 'TỔNG';
+  
+  // Add click event for total details
+  totalCompanyCell.addEventListener('click', () => {
+    showTotalDetail();
+  });
+  
+  totalTr.appendChild(totalCompanyCell);
+
+  const totalPeopleCell = document.createElement('td');
+  totalPeopleCell.classList.add('people-cell');
+  const grandTotal = dailyTotalsFiltered.reduce((sum, val) => sum + val, 0);
+  totalPeopleCell.textContent = formatNumber(grandTotal);
+  totalTr.appendChild(totalPeopleCell);
+
+  dailyTotalsFiltered.forEach((total, dayIndex) => {
+    const td = document.createElement('td');
+    td.classList.add('data-cell');
+    const inner = document.createElement('div');
+    inner.classList.add('data-cell-inner');
+    inner.textContent = total > 0 ? total : '';
+    if (total > 0) {
+      td.classList.add('has-data');
+      if (total > 100) {
+        td.classList.add('high-volume');
+      }
+      
+      // Thêm sự kiện click cho ô dữ liệu trong hàng tổng
+      td.addEventListener('click', () => {
+        showDailyTotalDetail(timeline.dates[dayIndex], dayIndex);
+      });
+      td.classList.add('clickable');
+    } else {
+      td.classList.add('empty');
+    }
+    // Mark weekends for total row
+    const weekday = timeline.weekdays[dayIndex];  
+    if (weekday === 'CN' || weekday === 'T7') {
+      td.classList.add('weekend');
+    }
+    td.appendChild(inner);
+    totalTr.appendChild(td);
+  });
+  tbody.appendChild(totalTr);
+  
   // Create data rows
   timeline.rows.forEach(row => {
     const tr = document.createElement('tr');
@@ -434,73 +483,6 @@ function renderTimeline(timeline) {
     
     tbody.appendChild(tr);
   });
-
-  // Calculate daily totals for the currently displayed companies
-  const dailyTotalsFiltered = new Array(timeline.dates.length).fill(0);
-  timeline.rows.forEach(row => {
-    row.data.forEach((value, index) => {
-      dailyTotalsFiltered[index] += value;
-    });
-  });
-
-  // Add spacing row
-  const spacingTr = document.createElement('tr');
-  spacingTr.classList.add('spacing-row');
-  const spacingCell = document.createElement('td');
-  spacingCell.colSpan = timeline.dates.length + 2; // +2 for company, people columns
-  spacingTr.appendChild(spacingCell);
-  tbody.appendChild(spacingTr);
-
-  // Add total row
-  const totalTr = document.createElement('tr');
-  totalTr.classList.add('total-row', 'clickable');
-
-  const totalCompanyCell = document.createElement('td');
-  totalCompanyCell.classList.add('company-cell');
-  totalCompanyCell.textContent = 'TỔNG';
-  
-  // Add click event for total details
-  totalCompanyCell.addEventListener('click', () => {
-    showTotalDetail();
-  });
-  
-  totalTr.appendChild(totalCompanyCell);
-
-  const totalPeopleCell = document.createElement('td');
-  totalPeopleCell.classList.add('people-cell');
-  const grandTotal = dailyTotalsFiltered.reduce((sum, val) => sum + val, 0);
-  totalPeopleCell.textContent = formatNumber(grandTotal);
-  totalTr.appendChild(totalPeopleCell);
-
-  dailyTotalsFiltered.forEach((total, dayIndex) => {
-    const td = document.createElement('td');
-    td.classList.add('data-cell');
-    const inner = document.createElement('div');
-    inner.classList.add('data-cell-inner');
-    inner.textContent = total > 0 ? total : '';
-    if (total > 0) {
-      td.classList.add('has-data');
-      if (total > 100) {
-        td.classList.add('high-volume');
-      }
-      
-      // Thêm sự kiện click cho ô dữ liệu trong hàng tổng
-      td.addEventListener('click', () => {
-        showDailyTotalDetail(timeline.dates[dayIndex], dayIndex);
-      });
-      td.classList.add('clickable');
-    } else {
-      td.classList.add('empty');
-    }
-    // Mark weekends for total row
-    const weekday = timeline.weekdays[dayIndex];  
-    if (weekday === 'CN' || weekday === 'T7') {
-      td.classList.add('weekend');
-    }
-    td.appendChild(inner);
-    totalTr.appendChild(td);
-  });
-  tbody.appendChild(totalTr);
 }
 
 // Hàm định dạng ngày tháng năm
@@ -939,6 +921,9 @@ function onClinicalDataLoaded(data) {
     return;
   }
   
+  // Lưu dữ liệu vào biến global
+  clinicalData = data;
+  
   renderClinicalTable(data);
 }
 
@@ -967,18 +952,23 @@ function renderClinicalTable(clinicalData = null) {
     totals[col.key] = data.reduce((sum, row) => sum + (row[col.key] || 0), 0);
   });
 
-  // Tạo HTML cho bảng theo thứ tự cột đã định nghĩa
+  // Tạo HTML cho bảng với 2 hàng header (Sáng/Chiều)
   let tableHTML = `
     <table class="clinical-table" id="clinicalTable">
       <thead>
         <tr class="clinical-header-row">
-          <th class="clinical-header company-header">Công ty</th>
-          <th class="clinical-header people-header">Người</th>
+          <th class="clinical-header company-header" rowspan="2">Công ty</th>
+          <th class="clinical-header people-header" rowspan="2">Người</th>
+          <th class="clinical-header" colspan="10">Sáng</th>
+          <th class="clinical-header" colspan="10">Chiều</th>
+        </tr>
+        <tr class="clinical-header-row">
   `;
   
   // Thêm header cho các cột cận lâm sàng theo thứ tự đã định nghĩa
   columns.forEach(col => {
-    tableHTML += `<th class="clinical-header">${col.label}</th>`;
+    const shortLabel = col.label.replace(' sáng', '').replace(' chiều', '');
+    tableHTML += `<th class="clinical-header">${shortLabel}</th>`;
   });
   
   tableHTML += `
@@ -986,6 +976,32 @@ function renderClinicalTable(clinicalData = null) {
       </thead>
       <tbody>
   `;
+  
+  // Thêm hàng tổng lên đầu
+  if (data.length > 0) {
+    // Tính tổng số người khám
+    const totalPeople = data.reduce((sum, row) => sum + (row.employee || 0), 0);
+    
+    tableHTML += `
+      <tr class="clinical-total-row clickable">
+        <td class="clinical-data-cell company-cell" onclick="showTotalDetail()">TỔNG</td>
+        <td class="clinical-data-cell people-cell clickable" onclick="showTotalDetail()">
+          <div class="clinical-data-inner">${totalPeople}</div>
+        </td>
+    `;
+    
+    columns.forEach(col => {
+      const total = totals[col.key] || 0;
+      const cellClass = total > 100 ? 'high-volume' : (total > 0 ? 'has-data' : 'empty');
+      tableHTML += `
+        <td class="clinical-data-cell ${cellClass}" onclick="showClinicalColumnDetail('${col.key}', '${col.label}')">
+          <div class="clinical-data-inner">${total > 0 ? total : ''}</div>
+        </td>
+      `;
+    });
+    
+    tableHTML += `</tr>`;
+  }
 
   // Tạo các hàng dữ liệu
   data.forEach(row => {
@@ -994,12 +1010,22 @@ function renderClinicalTable(clinicalData = null) {
         <td class="clinical-data-cell company-cell clickable" onclick="showCompanyDetail('${row.company}')">
           ${shortenCompanyName(row.company)}
         </td>
-        <td class="clinical-data-cell people-cell">${row.employee}</td>
+        <td class="clinical-data-cell people-cell">
+          <div class="clinical-data-inner has-data">${row.employee}</div>
+        </td>
     `;
     
     columns.forEach(col => {
       const value = row[col.key] || 0;
-      const cellClass = value > 0 ? 'has-data' : 'empty';
+      let cellClass = '';
+      if (value > 100) {
+        cellClass = 'has-data high-volume';
+      } else if (value > 0) {
+        cellClass = 'has-data';
+      } else {
+        cellClass = 'empty';
+      }
+      
       tableHTML += `
         <td class="clinical-data-cell ${cellClass}">
           <div class="clinical-data-inner">${value > 0 ? value : ''}</div>
@@ -1010,25 +1036,7 @@ function renderClinicalTable(clinicalData = null) {
     tableHTML += `</tr>`;
   });
 
-  // Thêm hàng tổng
-  if (data.length > 0) {
-    tableHTML += `
-      <tr class="clinical-total-row">
-        <td class="clinical-data-cell company-cell">TỔNG</td>
-        <td class="clinical-data-cell people-cell">${data.length}</td>
-    `;
-    
-    columns.forEach(col => {
-      const total = totals[col.key] || 0;
-      tableHTML += `
-        <td class="clinical-data-cell">
-          <div class="clinical-data-inner">${total}</div>
-        </td>
-      `;
-    });
-    
-    tableHTML += `</tr>`;
-  }
+
 
   tableHTML += `
       </tbody>
@@ -1052,14 +1060,73 @@ renderDashboard = function(data) {
   renderClinicalTable();
 };
 
-// Cập nhật hàm applyFilters để cập nhật cả bảng cận lâm sàng
-const originalApplyFilters = applyFilters;
-applyFilters = function() {
-  // Gọi hàm apply filters gốc
-  originalApplyFilters();
+// Hàm hiển thị chi tiết cột cận lâm sàng
+function showClinicalColumnDetail(columnKey, columnLabel) {
+  if (!clinicalData || !clinicalData.data) {
+    alert('Không có dữ liệu để hiển thị');
+    return;
+  }
   
-  // Cập nhật bảng cận lâm sàng
-  renderClinicalTable();
-};
+  // Lọc các công ty có dữ liệu cho cột này
+  const companiesWithData = clinicalData.data.filter(row => (row[columnKey] || 0) > 0);
+  
+  if (companiesWithData.length === 0) {
+    alert(`Không có công ty nào có dữ liệu cho ${columnLabel}`);
+    return;
+  }
+  
+  // Sắp xếp theo số lượng giảm dần
+  companiesWithData.sort((a, b) => (b[columnKey] || 0) - (a[columnKey] || 0));
+  
+  let detailHTML = `
+    <div class="modal-header">
+      <h3>Chi tiết ${columnLabel}</h3>
+      <span class="close" onclick="closeModal()">&times;</span>
+    </div>
+    <div class="modal-content">
+      <div class="detail-summary">
+        <p><strong>Tổng số công ty:</strong> ${companiesWithData.length}</p>
+        <p><strong>Tổng số người:</strong> ${companiesWithData.reduce((sum, row) => sum + (row[columnKey] || 0), 0)}</p>
+      </div>
+      <div class="company-list">
+  `;
+  
+  companiesWithData.forEach(row => {
+    const count = row[columnKey] || 0;
+    detailHTML += `
+      <div class="company-item" onclick="showCompanyDetail('${row.company}')">
+        <span class="company-name">${shortenCompanyName(row.company)}</span>
+        <span class="company-count ${count > 100 ? 'high-volume' : 'normal'}">${count}</span>
+      </div>
+    `;
+  });
+  
+  detailHTML += `
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('modalContent').innerHTML = detailHTML;
+  document.getElementById('detailModal').style.display = 'block';
+}
+
+// Cập nhật hàm applyFilters để gọi getClinicalData với đúng tham số
+function applyFilters() {
+  if (!originalData) return;
+  
+  // Gọi API server để lấy dữ liệu mới với tất cả filters
+  showLoading();
+  
+  google.script.run
+    .withSuccessHandler(onFilterDataLoaded)
+    .withFailureHandler(onDataError)
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+  
+  // Cũng gọi getClinicalData với cùng các tham số filter
+  google.script.run
+    .withSuccessHandler(onClinicalDataLoaded)
+    .withFailureHandler(onDataError)
+    .getClinicalData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+}
 
 </script>

@@ -750,7 +750,8 @@ function getCurrentUser() {
  */
 function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all') {
   try {
-    const scheduleData = getScheduleData(month, year, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+    // Luôn lọc theo tháng và chỉ hiển thị công ty chưa khám xong
+    const scheduleData = getScheduleData(month, year, false, searchCompany, filterEmployee, shiftFilter, timeFilter);
     
     if (!scheduleData.success) {
       return scheduleData;
@@ -789,7 +790,7 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
       
       const clinicalRow = {
         company: companyName,
-        employee: details.employee || '',
+        employee: details.totalPeople || 0,
         // Tính tổng siêu âm
         tongSieuAmSang: (details.sieuAmBungSang || 0) + (details.sieuAmVuSang || 0) + 
                        (details.sieuAmGiapSang || 0) + (details.sieuAmTimSang || 0) + 
@@ -818,11 +819,15 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
         sieuAmDanHoiMoGanChieu: details.sieuAmDanHoiMoGanChieu || 0
       };
       
-      clinicalData.push(clinicalRow);
+      // Chỉ thêm công ty nếu có ít nhất một hạng mục cận lâm sàng > 0
+      const hasClinicalData = clinicalColumns.some(col => clinicalRow[col.key] > 0);
+      if (hasClinicalData) {
+        clinicalData.push(clinicalRow);
+      }
     });
     
-    // Sắp xếp theo tên công ty
-    clinicalData.sort((a, b) => a.company.localeCompare(b.company, 'vi'));
+    // Sắp xếp theo số người giảm dần (nhiều người nhất lên đầu)
+    clinicalData.sort((a, b) => b.employee - a.employee);
     
     return {
       success: true,
