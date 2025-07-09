@@ -968,10 +968,10 @@ function renderClinicalTable(clinicalData = null) {
     <table class="clinical-table" id="clinicalTable">
       <thead>
         <tr class="clinical-header-row clinical-header-main">
-          <th class="clinical-header company-header" rowspan="2">Ngày</th>
-          <th class="clinical-header people-header" rowspan="2">Max</th>
-          <th class="clinical-header" colspan="9" style="border-right: 2px solid #2563eb;">Sáng</th>
-          <th class="clinical-header" colspan="9">Chiều</th>
+          <th class="clinical-header company-header" rowspan="2">Công ty</th>
+          <th class="clinical-header people-header" rowspan="2">Người</th>
+          <th class="clinical-header" colspan="10" style="border-right: 2px solid #2563eb;">Sáng</th>
+          <th class="clinical-header" colspan="10">Chiều</th>
         </tr>
         <tr class="clinical-header-row clinical-header-sub">
   `;
@@ -988,17 +988,41 @@ function renderClinicalTable(clinicalData = null) {
       <tbody>
   `;
   
-  // Bỏ hàng tổng vì đã chuyển sang hiển thị theo ngày
+  // Thêm hàng tổng lên đầu
+  if (data.length > 0) {
+    // Tính tổng số người khám
+    const totalPeople = data.reduce((sum, row) => sum + (row.employee || 0), 0);
+    
+    tableHTML += `
+      <tr class="clinical-total-row clickable">
+        <td class="clinical-data-cell company-cell" onclick="showTotalDetail()">TỔNG</td>
+        <td class="clinical-data-cell people-cell clickable" onclick="showTotalDetail()">
+          <div class="clinical-data-inner">${totalPeople}</div>
+        </td>
+    `;
+    
+    columns.forEach(col => {
+      const total = totals[col.key] || 0;
+      const cellClass = total > 100 ? 'high-volume' : (total > 0 ? 'has-data' : 'empty');
+      tableHTML += `
+        <td class="clinical-data-cell ${cellClass} clickable" onclick="showClinicalColumnDetail('${col.key}', '${col.label}')">
+          <div class="clinical-data-inner">${total > 0 ? total : ''}</div>
+        </td>
+      `;
+    });
+    
+    tableHTML += `</tr>`;
+  }
 
-  // Tạo các hàng dữ liệu theo ngày
+  // Tạo các hàng dữ liệu
   data.forEach(row => {
     tableHTML += `
       <tr class="clinical-row">
-        <td class="clinical-data-cell company-cell">
-          ${row.date}
+        <td class="clinical-data-cell company-cell clickable" onclick="showCompanyDetail('${row.company}')">
+          ${shortenCompanyName(row.company)}
         </td>
         <td class="clinical-data-cell people-cell">
-          <div class="clinical-data-inner has-data">${row.max}</div>
+          <div class="clinical-data-inner has-data">${row.employee}</div>
         </td>
     `;
     
@@ -1014,7 +1038,7 @@ function renderClinicalTable(clinicalData = null) {
       }
       
       tableHTML += `
-        <td class="clinical-data-cell ${cellClass} ${value > 0 ? 'clickable' : ''}" ${value > 0 ? `onclick="showClinicalColumnDetail('${col.key}', '${col.label}')"` : ''}>
+        <td class="clinical-data-cell ${cellClass}">
           <div class="clinical-data-inner">${value > 0 ? value : ''}</div>
         </td>
       `;
@@ -1047,25 +1071,68 @@ renderDashboard = function(data) {
   renderClinicalTable();
 };
 
-// Bỏ hàm showTotalDetail vì không còn hàng tổng
+// Hàm hiển thị chi tiết tổng cận lâm sàng
+function showTotalDetail() {
+  if (!clinicalData || !clinicalData.data) {
+    alert('Không có dữ liệu để hiển thị');
+    return;
+  }
+  
+  const data = clinicalData.data;
+  const totalPeople = data.reduce((sum, row) => sum + (row.employee || 0), 0);
+  
+  // Sắp xếp theo số người giảm dần
+  const sortedData = [...data].sort((a, b) => (b.employee || 0) - (a.employee || 0));
+  
+  let detailHTML = `
+    <div class="modal-header">
+      <h3>Chi tiết tổng cận lâm sàng</h3>
+      <span class="close" onclick="closeDetailModal()">&times;</span>
+    </div>
+    <div class="modal-content">
+      <div class="detail-summary">
+        <p><strong>Tổng số công ty:</strong> ${data.length}</p>
+        <p><strong>Tổng số người:</strong> ${totalPeople}</p>
+      </div>
+      <div class="company-list">
+  `;
+  
+  sortedData.forEach(row => {
+    const count = row.employee || 0;
+    detailHTML += `
+      <div class="company-item" onclick="showCompanyDetail('${row.company}')">
+        <span class="company-name">${shortenCompanyName(row.company)}</span>
+        <span class="company-count ${count > 100 ? 'high-volume' : 'normal'}">${count}</span>
+      </div>
+    `;
+  });
+  
+  detailHTML += `
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('modalContent').innerHTML = detailHTML;
+  document.getElementById('detailModal').style.display = 'block';
+}
 
-// Hàm hiển thị chi tiết cột cận lâm sàng theo ngày
+// Hàm hiển thị chi tiết cột cận lâm sàng
 function showClinicalColumnDetail(columnKey, columnLabel) {
   if (!clinicalData || !clinicalData.data) {
     alert('Không có dữ liệu để hiển thị');
     return;
   }
   
-  // Lọc các ngày có dữ liệu cho cột này
-  const daysWithData = clinicalData.data.filter(row => (row[columnKey] || 0) > 0);
+  // Lọc các công ty có dữ liệu cho cột này
+  const companiesWithData = clinicalData.data.filter(row => (row[columnKey] || 0) > 0);
   
-  if (daysWithData.length === 0) {
-    alert(`Không có ngày nào có dữ liệu cho ${columnLabel}`);
+  if (companiesWithData.length === 0) {
+    alert(`Không có công ty nào có dữ liệu cho ${columnLabel}`);
     return;
   }
   
   // Sắp xếp theo số lượng giảm dần
-  daysWithData.sort((a, b) => (b[columnKey] || 0) - (a[columnKey] || 0));
+  companiesWithData.sort((a, b) => (b[columnKey] || 0) - (a[columnKey] || 0));
   
   let detailHTML = `
     <div class="modal-header">
@@ -1074,17 +1141,17 @@ function showClinicalColumnDetail(columnKey, columnLabel) {
     </div>
     <div class="modal-content">
       <div class="detail-summary">
-        <p><strong>Tổng số ngày:</strong> ${daysWithData.length}</p>
-        <p><strong>Tổng số người:</strong> ${daysWithData.reduce((sum, row) => sum + (row[columnKey] || 0), 0)}</p>
+        <p><strong>Tổng số công ty:</strong> ${companiesWithData.length}</p>
+        <p><strong>Tổng số người:</strong> ${companiesWithData.reduce((sum, row) => sum + (row[columnKey] || 0), 0)}</p>
       </div>
       <div class="company-list">
   `;
   
-  daysWithData.forEach(row => {
+  companiesWithData.forEach(row => {
     const count = row[columnKey] || 0;
     detailHTML += `
-      <div class="company-item">
-        <span class="company-name">${row.date}</span>
+      <div class="company-item" onclick="showCompanyDetail('${row.company}')">
+        <span class="company-name">${shortenCompanyName(row.company)}</span>
         <span class="company-count ${count > 100 ? 'high-volume' : 'normal'}">${count}</span>
       </div>
     `;

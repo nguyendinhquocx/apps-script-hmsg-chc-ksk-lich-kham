@@ -270,7 +270,6 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
         employee: record.tenNhanVien ? record.tenNhanVien.trim() : '',
         ngayBatDau: formatDate(record.ngayBatDau),
         ngayKetThuc: formatDate(record.ngayKetThuc),
-        ngayKham: formatDate(record.ngayBatDau), // Thêm trường ngayKham
         // Cận lâm sàng - Sáng
         sieuAmBungSang: 0,
         khamPhuKhoaSang: 0,
@@ -773,7 +772,7 @@ function getCurrentUser() {
 }
 
 /**
- * Lấy dữ liệu cận lâm sàng cho bảng hiển thị theo ngày
+ * Lấy dữ liệu cận lâm sàng cho bảng hiển thị
  */
 function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all') {
   try {
@@ -809,108 +808,43 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
       { key: 'sieuAmDanHoiMoGanChieu', label: 'Siêu âm đàn hồi mô gan chiều' }
     ];
     
-    // Tạo dữ liệu theo ngày thay vì theo công ty
-    const currentMonth = month || (new Date().getMonth() + 1);
-    const currentYear = year || new Date().getFullYear();
-    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
-    
-    // Tạo object để lưu dữ liệu theo ngày
-    const dailyClinicalData = {};
-    
-    // Khởi tạo dữ liệu cho tất cả các ngày trong tháng
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-      const dateDisplay = `${day.toString().padStart(2, '0')}/${currentMonth.toString().padStart(2, '0')}/${currentYear}`;
-      
-      dailyClinicalData[dateKey] = {
-        date: dateDisplay,
-        dateKey: dateKey,
-        // Khởi tạo tất cả các cột với giá trị 0
-        khamPhuKhoaSang: 0,
-        xQuangSang: 0,
-        dienTamDoSang: 0,
-        sieuAmBungSang: 0,
-        sieuAmVuSang: 0,
-        sieuAmGiapSang: 0,
-        sieuAmTimSang: 0,
-        sieuAmDongMachCanhSang: 0,
-        sieuAmDanHoiMoGanSang: 0,
-        khamPhuKhoaChieu: 0,
-        xQuangChieu: 0,
-        dienTamDoChieu: 0,
-        sieuAmBungChieu: 0,
-        sieuAmVuChieu: 0,
-        sieuAmGiapChieu: 0,
-        sieuAmTimChieu: 0,
-        sieuAmDongMachCanhChieu: 0,
-        sieuAmDanHoiMoGanChieu: 0
-      };
-    }
-    
-    // Tổng hợp dữ liệu từ tất cả các công ty theo ngày
+    // Xử lý dữ liệu cho từng công ty (scheduleData đã lọc công ty chưa khám xong)
     Object.keys(companyDetails).forEach(companyName => {
       const details = companyDetails[companyName];
-      const ngayKham = details.ngayKham;
-      
-      if (ngayKham) {
-        // Chuyển đổi ngày khám sang dateKey
-        const khamDate = parseDate(ngayKham);
-        if (khamDate) {
-          const dateKey = formatDateKey(khamDate);
-          
-          if (dailyClinicalData[dateKey]) {
-            // Cộng dồn số liệu của công ty vào ngày tương ứng
-            clinicalColumns.forEach(col => {
-              dailyClinicalData[dateKey][col.key] += details[col.key] || 0;
-            });
-          }
-        }
-      }
-    });
-    
-    // Chuyển đổi object thành array và tính Max cho mỗi ngày
-    Object.keys(dailyClinicalData).forEach(dateKey => {
-      const dayData = dailyClinicalData[dateKey];
-      
-      // Tính giá trị Max của tất cả các hạng mục khám trong ngày
-      const maxValue = Math.max(
-        ...clinicalColumns.map(col => dayData[col.key] || 0)
-      );
       
       const clinicalRow = {
-        date: dayData.date,
-        dateKey: dateKey,
-        max: maxValue, // Thay thế cột 'employee' bằng 'max'
-        // Các cột cận lâm sàng
-        khamPhuKhoaSang: dayData.khamPhuKhoaSang,
-        xQuangSang: dayData.xQuangSang,
-        dienTamDoSang: dayData.dienTamDoSang,
-        sieuAmBungSang: dayData.sieuAmBungSang,
-        sieuAmVuSang: dayData.sieuAmVuSang,
-        sieuAmGiapSang: dayData.sieuAmGiapSang,
-        sieuAmTimSang: dayData.sieuAmTimSang,
-        sieuAmDongMachCanhSang: dayData.sieuAmDongMachCanhSang,
-        sieuAmDanHoiMoGanSang: dayData.sieuAmDanHoiMoGanSang,
-        khamPhuKhoaChieu: dayData.khamPhuKhoaChieu,
-        xQuangChieu: dayData.xQuangChieu,
-        dienTamDoChieu: dayData.dienTamDoChieu,
-        sieuAmBungChieu: dayData.sieuAmBungChieu,
-        sieuAmVuChieu: dayData.sieuAmVuChieu,
-        sieuAmGiapChieu: dayData.sieuAmGiapChieu,
-        sieuAmTimChieu: dayData.sieuAmTimChieu,
-        sieuAmDongMachCanhChieu: dayData.sieuAmDongMachCanhChieu,
-        sieuAmDanHoiMoGanChieu: dayData.sieuAmDanHoiMoGanChieu
+        company: companyName,
+        employee: details.tongNguoi || 0,
+        // Các cột cận lâm sàng (bỏ tổng siêu âm)
+        khamPhuKhoaSang: details.khamPhuKhoaSang || 0,
+        xQuangSang: details.xQuangSang || 0,
+        dienTamDoSang: details.dienTamDoSang || 0,
+        sieuAmBungSang: details.sieuAmBungSang || 0,
+        sieuAmVuSang: details.sieuAmVuSang || 0,
+        sieuAmGiapSang: details.sieuAmGiapSang || 0,
+        sieuAmTimSang: details.sieuAmTimSang || 0,
+        sieuAmDongMachCanhSang: details.sieuAmDongMachCanhSang || 0,
+        sieuAmDanHoiMoGanSang: details.sieuAmDanHoiMoGanSang || 0,
+        khamPhuKhoaChieu: details.khamPhuKhoaChieu || 0,
+        xQuangChieu: details.xQuangChieu || 0,
+        dienTamDoChieu: details.dienTamDoChieu || 0,
+        sieuAmBungChieu: details.sieuAmBungChieu || 0,
+        sieuAmVuChieu: details.sieuAmVuChieu || 0,
+        sieuAmGiapChieu: details.sieuAmGiapChieu || 0,
+        sieuAmTimChieu: details.sieuAmTimChieu || 0,
+        sieuAmDongMachCanhChieu: details.sieuAmDongMachCanhChieu || 0,
+        sieuAmDanHoiMoGanChieu: details.sieuAmDanHoiMoGanChieu || 0
       };
       
-      // Chỉ thêm ngày nếu có ít nhất một hạng mục cận lâm sàng > 0
+      // Chỉ thêm công ty nếu có ít nhất một hạng mục cận lâm sàng > 0
       const hasClinicalData = clinicalColumns.some(col => clinicalRow[col.key] > 0);
       if (hasClinicalData) {
         clinicalData.push(clinicalRow);
       }
     });
     
-    // Sắp xếp theo ngày tăng dần
-    clinicalData.sort((a, b) => new Date(a.dateKey) - new Date(b.dateKey));
+    // Sắp xếp theo số người giảm dần (nhiều người nhất lên đầu)
+    clinicalData.sort((a, b) => b.employee - a.employee);
     
     return {
       success: true,
