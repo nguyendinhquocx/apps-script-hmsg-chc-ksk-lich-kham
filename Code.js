@@ -388,10 +388,27 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
   
   // Nếu không hiển thị completed, loại bỏ khỏi timeline
   if (!showCompleted) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time để so sánh chỉ ngày
+    
     Object.keys(companySchedules).forEach(companyName => {
       const status = companyStatus[companyName] || '';
       const statusLower = status.toLowerCase().trim();
+      const companyDetail = companyDetails[companyName];
+      
+      // Kiểm tra trạng thái "Đã khám xong" HOẶC ngày kết thúc < hôm nay
+      let shouldRemove = false;
+      
       if (statusLower === 'đã khám xong' || statusLower === 'da kham xong') {
+        shouldRemove = true;
+      } else if (companyDetail && companyDetail.ngayKetThuc) {
+        const endDate = parseDate(companyDetail.ngayKetThuc);
+        if (endDate && endDate < today) {
+          shouldRemove = true;
+        }
+      }
+      
+      if (shouldRemove) {
         delete companySchedules[companyName];
         delete companyTotals[companyName];
       }

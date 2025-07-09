@@ -435,11 +435,22 @@ function renderTimeline(timeline) {
     
     tr.appendChild(companyCell);
     
-    // People count cell
+    // People count cell - Hiển thị tổng số người trong cả giai đoạn
     const peopleCell = document.createElement('td');
     peopleCell.classList.add('people-cell');
-    if (row.total > 0) {
-      peopleCell.textContent = formatNumber(row.total);
+    
+    // Lấy thông tin chi tiết công ty để tính tổng số người đúng
+    let totalPeopleForCompany = 0;
+    if (originalData && originalData.companyDetails && originalData.companyDetails[row.company]) {
+      const companyDetail = originalData.companyDetails[row.company];
+      totalPeopleForCompany = companyDetail.tongNguoi || 0;
+    } else {
+      // Fallback: sử dụng row.total nếu không có companyDetails
+      totalPeopleForCompany = row.total || 0;
+    }
+    
+    if (totalPeopleForCompany > 0) {
+      peopleCell.textContent = formatNumber(totalPeopleForCompany);
     } else {
       peopleCell.textContent = '0';
     }
