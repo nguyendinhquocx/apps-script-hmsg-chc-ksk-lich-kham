@@ -10,7 +10,7 @@ const CONFIG = {
   SHEET_ID: '15eMfEvqNvy1qBNG1NXwr7eSBsYZA6KqlBB3lTyzTfhM',
   SHEET_NAME: 'chc',
   CACHE_DURATION: 300,
-  DATE_FORMAT: 'dd/MM/yyyy',
+  DATE_FORMAT: 'mm/dd/yyyy',
   HIGH_VOLUME_THRESHOLD: 50
 };
 
@@ -411,6 +411,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       if (shouldRemove) {
         delete companySchedules[companyName];
         delete companyTotals[companyName];
+        delete companyDetails[companyName]; // Cũng xóa khỏi companyDetails
       }
     });
   }
@@ -683,23 +684,23 @@ function parseDate(dateString) {
         
         if (format.source.includes('yyyy')) {
           if (format.source.startsWith('^\\(\\d{4}\\)')) {
+            // Format yyyy-mm-dd
             year = parseInt(match[1]);
             month = parseInt(match[2]);
             day = parseInt(match[3]);
           } else {
+            // Format mm/dd/yyyy hoặc mm-dd-yyyy (định dạng Google Sheets)
             const part1 = parseInt(match[1]);
             const part2 = parseInt(match[2]);
             year = parseInt(match[3]);
             
-            if (part1 > 12) {
-              day = part1;
-              month = part2;
-            } else if (part2 > 12) {
-              month = part1;
-              day = part2;
-            } else {
-              day = part1;
-              month = part2;
+            // Coi part1 là tháng, part2 là ngày (định dạng mm/dd/yyyy)
+            month = part1;
+            day = part2;
+            
+            // Kiểm tra tính hợp lệ
+            if (day > 31 || month > 12 || day < 1 || month < 1) {
+              continue; // Bỏ qua format này nếu không hợp lệ
             }
           }
         }
@@ -728,12 +729,12 @@ function formatDateKey(date) {
 }
 
 /**
- * Định dạng ngày tháng theo dd/mm/yyyy
+ * Định dạng ngày tháng theo mm/dd/yyyy (Google Sheets format)
  */
 function formatDate(dateString) {
   if (!dateString) return '';
   
-  // Kiểm tra nếu dateString đã là định dạng dd/mm/yyyy
+  // Kiểm tra nếu dateString đã là định dạng mm/dd/yyyy
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
     return dateString;
   }
@@ -747,7 +748,7 @@ function formatDate(dateString) {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     
-    return `${day}/${month}/${year}`;
+    return `${month}/${day}/${year}`;
   } catch (e) {
     console.error('Lỗi định dạng ngày:', e);
     return dateString;
@@ -775,8 +776,8 @@ function getCurrentUser() {
  */
 function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all') {
   try {
-    // Lấy dữ liệu với showCompleted = false để chỉ hiển thị công ty chưa khám xong
-    const scheduleData = getScheduleData(month, year, false, searchCompany, filterEmployee, shiftFilter, timeFilter);
+    // Lấy dữ liệu với tham số showCompleted được truyền vào
+    const scheduleData = getScheduleData(month, year, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
     
     if (!scheduleData.success) {
       return scheduleData;

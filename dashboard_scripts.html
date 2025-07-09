@@ -496,11 +496,11 @@ function renderTimeline(timeline) {
   });
 }
 
-// Hàm định dạng ngày tháng năm
+// Hàm định dạng ngày tháng năm theo mm/dd/yyyy (Google Sheets format)
 function formatDate(dateString) {
   if (!dateString) return '';
   
-  // Kiểm tra nếu dateString đã là định dạng dd/mm/yyyy
+  // Kiểm tra nếu dateString đã là định dạng mm/dd/yyyy
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
     return dateString;
   }
@@ -514,7 +514,7 @@ function formatDate(dateString) {
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     
-    return `${day}/${month}/${year}`;
+    return `${month}/${day}/${year}`;
   } catch (e) {
     console.error('Lỗi định dạng ngày:', e);
     return dateString;
