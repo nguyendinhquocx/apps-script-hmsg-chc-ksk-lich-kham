@@ -996,14 +996,20 @@ function renderClinicalTable(clinicalData = null) {
         case 'today':
           return row.date === currentDate || row.date.startsWith(currentDate) || row.dateKey === currentDate.replace('/', '');
         case 'week':
-          // Lọc 7 ngày gần nhất
-          const weekAgo = new Date();
-          weekAgo.setDate(today.getDate() - 7);
+          // Lọc tuần hiện tại (từ chủ nhật đến thứ 7)
+          const currentDay = today.getDay(); // 0 = CN, 1 = T2, ...
+          const daysSinceSunday = currentDay; // Số ngày từ chủ nhật đến hôm nay
+          const sunday = new Date(today);
+          sunday.setDate(today.getDate() - daysSinceSunday);
+          
+          const nextSunday = new Date(sunday);
+          nextSunday.setDate(sunday.getDate() + 6);
+          
           // Parse date từ row.date (format: DD/MM/YYYY)
           const dateParts = row.date.split('/');
           if (dateParts.length === 3) {
             const rowDate = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
-            return rowDate >= weekAgo && rowDate <= today;
+            return rowDate >= sunday && rowDate <= nextSunday;
           }
           return false;
         case 'month':
@@ -1092,6 +1098,14 @@ function renderClinicalTable(clinicalData = null) {
     // Kiểm tra ngày hiện tại với nhiều format khác nhau
     const isToday = row.date === currentDate || row.date.startsWith(currentDate) || row.dateKey === currentDate.replace('/', '');
     
+    // Kiểm tra xem có phải ngày Chủ nhật không
+    const dateParts = row.date.split('/');
+    let isSunday = false;
+    if (dateParts.length === 3) {
+      const rowDate = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+      isSunday = rowDate.getDay() === 0; // 0 = Chủ nhật
+    }
+    
     // Tìm giá trị lớn nhất cho sáng và chiều (chỉ trong các cột đã được lọc)
     const displayedMorningColumns = columns.filter(col => col.shift === 'morning');
     const displayedAfternoonColumns = columns.filter(col => col.shift === 'afternoon');
@@ -1101,21 +1115,24 @@ function renderClinicalTable(clinicalData = null) {
     let maxAfternoonValue = 0;
     let maxAfternoonKey = '';
     
-    displayedMorningColumns.forEach(col => {
-      const value = row[col.key] || 0;
-      if (value > maxMorningValue) {
-        maxMorningValue = value;
-        maxMorningKey = col.key;
-      }
-    });
-    
-    displayedAfternoonColumns.forEach(col => {
-      const value = row[col.key] || 0;
-      if (value > maxAfternoonValue) {
-        maxAfternoonValue = value;
-        maxAfternoonKey = col.key;
-      }
-    });
+    // Chỉ tính max value nếu không phải ngày Chủ nhật
+    if (!isSunday) {
+      displayedMorningColumns.forEach(col => {
+        const value = row[col.key] || 0;
+        if (value > maxMorningValue) {
+          maxMorningValue = value;
+          maxMorningKey = col.key;
+        }
+      });
+      
+      displayedAfternoonColumns.forEach(col => {
+        const value = row[col.key] || 0;
+        if (value > maxAfternoonValue) {
+          maxAfternoonValue = value;
+          maxAfternoonKey = col.key;
+        }
+      });
+    }
     
     tableHTML += `
       <tr class="clinical-row">
@@ -1128,9 +1145,10 @@ function renderClinicalTable(clinicalData = null) {
     `;
     
     columns.forEach(col => {
-      const value = row[col.key] || 0;
+      // Nếu là Chủ nhật thì không hiển thị số liệu khám (vì là ngày nghỉ)
+      const value = isSunday ? 0 : (row[col.key] || 0);
       let cellClass = '';
-      const isMaxValue = (col.key === maxMorningKey && maxMorningValue > 0) || (col.key === maxAfternoonKey && maxAfternoonValue > 0);
+      const isMaxValue = !isSunday && ((col.key === maxMorningKey && maxMorningValue > 0) || (col.key === maxAfternoonKey && maxAfternoonValue > 0));
       
       if (value > 100) {
         cellClass = 'has-data high-volume';
@@ -1142,6 +1160,11 @@ function renderClinicalTable(clinicalData = null) {
       
       if (isMaxValue) {
         cellClass += ' max-highlight';
+      }
+      
+      // Thêm class để đánh dấu ngày Chủ nhật
+      if (isSunday) {
+        cellClass += ' sunday-cell';
       }
       
       tableHTML += `

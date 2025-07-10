@@ -588,21 +588,21 @@ function applyTimeFilter(companySchedules, timeFilter) {
   const today = new Date();
   const currentDateKey = formatDateKey(today);
   
-  // Tính ngày đầu tuần (thứ 2)
+  // Tính ngày đầu tuần (chủ nhật)
   const currentDay = today.getDay(); // 0 = CN, 1 = T2, ...
-  const daysSinceMonday = currentDay === 0 ? 6 : currentDay - 1;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() - daysSinceMonday);
+  const daysSinceSunday = currentDay; // Số ngày từ chủ nhật đến hôm nay
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - daysSinceSunday);
   
-  // Tính ngày cuối tuần (chủ nhật)
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
+  // Tính ngày cuối tuần (thứ 7)
+  const nextSunday = new Date(sunday);
+  nextSunday.setDate(sunday.getDate() + 6);
   
-  // Tạo mảng các ngày trong tuần hiện tại
+  // Tạo mảng các ngày trong tuần hiện tại (từ chủ nhật đến thứ 7)
   const currentWeekDates = [];
   for (let i = 0; i < 7; i++) {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + i);
+    const date = new Date(sunday);
+    date.setDate(sunday.getDate() + i);
     currentWeekDates.push(formatDateKey(date));
   }
   
