@@ -847,8 +847,16 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
       };
     }
     
-    // Tổng hợp dữ liệu từ tất cả các công ty theo khoảng thời gian khám
+    // Tổng hợp dữ liệu từ các công ty theo khoảng thời gian khám
+    // Nếu có searchCompany, chỉ lấy dữ liệu từ công ty đó
     Object.keys(companyDetails).forEach(companyName => {
+      // Lọc theo searchCompany nếu có
+      if (searchCompany && searchCompany.trim() !== '') {
+        if (!companyName.toLowerCase().includes(searchCompany.toLowerCase())) {
+          return; // Bỏ qua công ty này nếu không khớp với tìm kiếm
+        }
+      }
+      
       const details = companyDetails[companyName];
       const ngayBatDau = details.ngayBatDau;
       const ngayKetThuc = details.ngayKetThuc;

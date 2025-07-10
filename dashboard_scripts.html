@@ -540,7 +540,6 @@ function showCompanyDetail(companyName) {
   }
   
   const modal = document.getElementById('detailModal');
-  const modalTitle = document.getElementById('modalTitle');
   const modalBody = document.getElementById('modalBody');
   
   // Thêm thông tin filter vào title
@@ -550,8 +549,6 @@ function showCompanyDetail(companyName) {
   } else if (shiftFilter === 'chieu' || shiftFilter === 'afternoon') {
     titleText += ' (Ca chiều)';
   }
-  
-  modalTitle.textContent = titleText;
   
   // Tính tổng số lượng khám sáng/chiều dựa trên shiftFilter hiện tại
   let displayMorning = 0;
@@ -585,6 +582,10 @@ function showCompanyDetail(companyName) {
   
   // 🔧 FIX: Apply formatNumber cho tất cả số liệu
   modalBody.innerHTML = `
+    <div class="modal-header">
+      <h3>${titleText}</h3>
+      <span class="close" onclick="closeDetailModal()">&times;</span>
+    </div>
     <div class="detail-row">
       <span class="detail-label">Số lượng khám sáng:</span>
       <span class="detail-value">${formatNumber(displayMorning)}</span>
@@ -661,7 +662,6 @@ function showTotalDetail() {
   }
   
   const modal = document.getElementById('detailModal');
-  const modalTitle = document.getElementById('modalTitle');
   const modalBody = document.getElementById('modalBody');
   
   // Display title theo current filter
@@ -682,10 +682,12 @@ function showTotalDetail() {
     }
   }
   
-  modalTitle.textContent = titleText;
-  
   // 🔧 FIX: Apply formatNumber cho tất cả số liệu
   modalBody.innerHTML = `
+    <div class="modal-header">
+      <h3>${titleText}</h3>
+      <span class="close" onclick="closeDetailModal()">&times;</span>
+    </div>
     <div class="detail-row">
       <span class="detail-label">Tổng số lượng khám sáng:</span>
       <span class="detail-value">${formatNumber(totalSang)}</span>
@@ -780,14 +782,17 @@ function showDailyTotalDetail(day, dayIndex) {
   }
   
   const modal = document.getElementById('detailModal');
-  const modalTitle = document.getElementById('modalTitle');
   const modalBody = document.getElementById('modalBody');
   
   // Hiển thị tiêu đề với thông tin ngày
-  modalTitle.textContent = `Chi tiết ngày ${dateStr} (${weekday})`;
+  const titleText = `Chi tiết ngày ${dateStr} (${weekday})`;
   
   // Tạo nội dung chi tiết
   let detailContent = `
+    <div class="modal-header">
+      <h3>${titleText}</h3>
+      <span class="close" onclick="closeDetailModal()">&times;</span>
+    </div>
     <div class="detail-row">
       <span class="detail-label">Tổng số người khám:</span>
       <span class="detail-value">${totalPeopleToday}</span>
@@ -965,8 +970,57 @@ function renderClinicalTable(clinicalData = null) {
   }
   
   // Sử dụng dữ liệu đã được xử lý từ server
-  const data = clinicalData.data;
-  const columns = clinicalData.columns;
+  let data = clinicalData.data;
+  let columns = clinicalData.columns;
+  
+  // Áp dụng bộ lọc timeFilter
+  if (timeFilter && timeFilter !== 'all') {
+    const today = new Date();
+    const currentDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    data = data.filter(row => {
+      switch(timeFilter) {
+        case 'today':
+          return row.date === currentDate || row.date.startsWith(currentDate) || row.dateKey === currentDate.replace('/', '');
+        case 'week':
+          // Lọc 7 ngày gần nhất
+          const weekAgo = new Date();
+          weekAgo.setDate(today.getDate() - 7);
+          // Parse date từ row.date (format: DD/MM/YYYY)
+          const dateParts = row.date.split('/');
+          if (dateParts.length === 3) {
+            const rowDate = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+            return rowDate >= weekAgo && rowDate <= today;
+          }
+          return false;
+        case 'month':
+          // Hiển thị tháng hiện tại (mặc định)
+          return true;
+        default:
+          return true;
+      }
+    });
+  }
+  
+  // Áp dụng bộ lọc shiftFilter
+  if (shiftFilter && shiftFilter !== 'total') {
+    columns = columns.filter(col => {
+      if (shiftFilter === 'sang') {
+        return col.shift === 'morning';
+      } else if (shiftFilter === 'chieu') {
+        return col.shift === 'afternoon';
+      }
+      return true;
+    });
+  }
+  
+  // Khi có searchCompany, chỉ hiển thị những ngày có dữ liệu
+  if (searchCompany && searchCompany.trim() !== '') {
+    data = data.filter(row => {
+      // Kiểm tra xem ngày này có dữ liệu không (có ít nhất 1 giá trị > 0)
+      return columns.some(col => (row[col.key] || 0) > 0);
+    });
+  }
 
   // Tính tổng cho từng cột
   const totals = {};
@@ -980,9 +1034,25 @@ function renderClinicalTable(clinicalData = null) {
       <thead>
         <tr class="clinical-header-row clinical-header-main">
           <th class="clinical-header company-header" rowspan="2">Ngày</th>
-          <th class="clinical-header people-header" rowspan="2">Max</th>
-          <th class="clinical-header" colspan="9">Sáng</th>
-          <th class="clinical-header" colspan="9">Chiều</th>
+          <th class="clinical-header people-header" rowspan="2">Max</th>`;
+  
+  // Tính số cột cho từng ca
+  const morningColumns = columns.filter(col => col.shift === 'morning');
+  const afternoonColumns = columns.filter(col => col.shift === 'afternoon');
+  
+  // Hiển thị header theo bộ lọc shift
+  if (shiftFilter === 'sang' || shiftFilter === 'total') {
+    if (morningColumns.length > 0) {
+      tableHTML += `<th class="clinical-header" colspan="${morningColumns.length}">Sáng</th>`;
+    }
+  }
+  if (shiftFilter === 'chieu' || shiftFilter === 'total') {
+    if (afternoonColumns.length > 0) {
+      tableHTML += `<th class="clinical-header" colspan="${afternoonColumns.length}">Chiều</th>`;
+    }
+  }
+  
+  tableHTML += `
         </tr>
         <tr class="clinical-header-row clinical-header-sub">
   `;
@@ -1009,16 +1079,16 @@ function renderClinicalTable(clinicalData = null) {
     // Kiểm tra ngày hiện tại với nhiều format khác nhau
     const isToday = row.date === currentDate || row.date.startsWith(currentDate) || row.dateKey === currentDate.replace('/', '');
     
-    // Tìm giá trị lớn nhất cho sáng và chiều
-    const morningColumns = columns.filter(col => col.shift === 'morning');
-    const afternoonColumns = columns.filter(col => col.shift === 'afternoon');
+    // Tìm giá trị lớn nhất cho sáng và chiều (chỉ trong các cột đã được lọc)
+    const displayedMorningColumns = columns.filter(col => col.shift === 'morning');
+    const displayedAfternoonColumns = columns.filter(col => col.shift === 'afternoon');
     
     let maxMorningValue = 0;
     let maxMorningKey = '';
     let maxAfternoonValue = 0;
     let maxAfternoonKey = '';
     
-    morningColumns.forEach(col => {
+    displayedMorningColumns.forEach(col => {
       const value = row[col.key] || 0;
       if (value > maxMorningValue) {
         maxMorningValue = value;
@@ -1026,7 +1096,7 @@ function renderClinicalTable(clinicalData = null) {
       }
     });
     
-    afternoonColumns.forEach(col => {
+    displayedAfternoonColumns.forEach(col => {
       const value = row[col.key] || 0;
       if (value > maxAfternoonValue) {
         maxAfternoonValue = value;
@@ -1156,9 +1226,8 @@ function showDayDetail(dateKey, dateDisplay) {
       <h3>Chi tiết ngày ${dateDisplay}</h3>
       <span class="close" onclick="closeDetailModal()">&times;</span>
     </div>
-    <div class="modal-content">
-      <div class="detail-summary">
-      </div>
+    <div class="detail-summary">
+    </div>
   `;
   
   // Hiển thị ca sáng
@@ -1208,7 +1277,6 @@ function showDayDetail(dateKey, dateDisplay) {
   }
   
   detailHTML += `
-    </div>
   `;
   
   document.getElementById('modalBody').innerHTML = detailHTML;
@@ -1230,20 +1298,24 @@ function showClinicalColumnDetail(columnKey, columnLabel) {
     return;
   }
   
-  // Sắp xếp theo số lượng giảm dần
-  daysWithData.sort((a, b) => (b[columnKey] || 0) - (a[columnKey] || 0));
+  // Sắp xếp theo thứ tự thời gian từ ngày đầu đến ngày cuối tháng
+  daysWithData.sort((a, b) => {
+    // Chuyển đổi dateKey thành số để so sánh (dateKey có format YYYYMMDD)
+    const dateA = parseInt(a.dateKey);
+    const dateB = parseInt(b.dateKey);
+    return dateA - dateB;
+  });
   
   let detailHTML = `
     <div class="modal-header">
       <h3>Chi tiết ${columnLabel}</h3>
       <span class="close" onclick="closeDetailModal()">&times;</span>
     </div>
-    <div class="modal-content">
-      <div class="detail-summary">
-        <p><strong>Tổng số ngày:</strong> ${daysWithData.length}</p>
-        <p><strong>Tổng số người:</strong> ${daysWithData.reduce((sum, row) => sum + (row[columnKey] || 0), 0)}</p>
-      </div>
-      <div class="company-list">
+    <div class="detail-summary">
+      <p><strong>Tổng số ngày:</strong> ${daysWithData.length}</p>
+    </div>
+    <br>
+    <div class="company-list">
   `;
   
   daysWithData.forEach(row => {
@@ -1258,7 +1330,6 @@ function showClinicalColumnDetail(columnKey, columnLabel) {
   
   detailHTML += `
       </div>
-    </div>
   `;
   
   document.getElementById('modalBody').innerHTML = detailHTML;
