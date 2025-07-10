@@ -1103,14 +1103,6 @@ function renderClinicalTable(clinicalData = null) {
     // Kiểm tra ngày hiện tại với nhiều format khác nhau
     const isToday = row.date === currentDate || row.date.startsWith(currentDate) || row.dateKey === currentDate.replace('/', '');
     
-    // Kiểm tra xem có phải ngày Chủ nhật không
-    const dateParts = row.date.split('/');
-    let isSunday = false;
-    if (dateParts.length === 3) {
-      const rowDate = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
-      isSunday = rowDate.getDay() === 0; // 0 = Chủ nhật
-    }
-    
     // Tìm giá trị lớn nhất cho sáng và chiều (chỉ trong các cột đã được lọc)
     const displayedMorningColumns = columns.filter(col => col.shift === 'morning');
     const displayedAfternoonColumns = columns.filter(col => col.shift === 'afternoon');
@@ -1120,24 +1112,21 @@ function renderClinicalTable(clinicalData = null) {
     let maxAfternoonValue = 0;
     let maxAfternoonKey = '';
     
-    // Chỉ tính max value nếu không phải ngày Chủ nhật
-    if (!isSunday) {
-      displayedMorningColumns.forEach(col => {
-        const value = row[col.key] || 0;
-        if (value > maxMorningValue) {
-          maxMorningValue = value;
-          maxMorningKey = col.key;
-        }
-      });
-      
-      displayedAfternoonColumns.forEach(col => {
-        const value = row[col.key] || 0;
-        if (value > maxAfternoonValue) {
-          maxAfternoonValue = value;
-          maxAfternoonKey = col.key;
-        }
-      });
-    }
+    displayedMorningColumns.forEach(col => {
+      const value = row[col.key] || 0;
+      if (value > maxMorningValue) {
+        maxMorningValue = value;
+        maxMorningKey = col.key;
+      }
+    });
+    
+    displayedAfternoonColumns.forEach(col => {
+      const value = row[col.key] || 0;
+      if (value > maxAfternoonValue) {
+        maxAfternoonValue = value;
+        maxAfternoonKey = col.key;
+      }
+    });
     
     tableHTML += `
       <tr class="clinical-row">
@@ -1145,15 +1134,14 @@ function renderClinicalTable(clinicalData = null) {
           ${row.date}
         </td>
         <td class="clinical-data-cell people-cell">
-          <div class="clinical-data-inner ${hasData && !isSunday ? 'has-data max-value' : 'empty'}">${hasData && !isSunday ? row.max : ''}</div>
+          <div class="clinical-data-inner ${hasData ? 'has-data max-value' : 'empty'}">${hasData ? row.max : ''}</div>
         </td>
     `;
     
     columns.forEach(col => {
-      // Nếu là Chủ nhật thì không hiển thị số liệu khám (vì là ngày nghỉ)
-      const value = isSunday ? 0 : (row[col.key] || 0);
+      const value = row[col.key] || 0;
       let cellClass = '';
-      const isMaxValue = !isSunday && ((col.key === maxMorningKey && maxMorningValue > 0) || (col.key === maxAfternoonKey && maxAfternoonValue > 0));
+      const isMaxValue = (col.key === maxMorningKey && maxMorningValue > 0) || (col.key === maxAfternoonKey && maxAfternoonValue > 0);
       
       if (value > 100) {
         cellClass = 'has-data high-volume';
@@ -1165,11 +1153,6 @@ function renderClinicalTable(clinicalData = null) {
       
       if (isMaxValue) {
         cellClass += ' max-highlight';
-      }
-      
-      // Thêm class để đánh dấu ngày Chủ nhật
-      if (isSunday) {
-        cellClass += ' sunday-cell';
       }
       
       tableHTML += `
@@ -1697,36 +1680,27 @@ function prepareClinicalChartData(data) {
   });
   
   filteredData.forEach(row => {
-    // Parse date to check if it's Sunday
-    const dateParts = row.date.split('/');
-    if (dateParts.length === 3) {
-      const dateObj = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+    // Extract day from date (DD/MM/YYYY -> DD)
+    const dayPart = row.date.split('/')[0];
+    labels.push(dayPart);
+    
+    // Calculate max value for this day based on current shift filter
+    let maxValue = 0;
+    
+    data.columns.forEach(col => {
+      const value = row[col.key] || 0;
       
-      // Skip Sundays
-      if (!isSunday(dateObj)) {
-        // Extract day from date (DD/MM/YYYY -> DD)
-        const dayPart = row.date.split('/')[0];
-        labels.push(dayPart);
-        
-        // Calculate max value for this day based on current shift filter
-        let maxValue = 0;
-        
-        data.columns.forEach(col => {
-          const value = row[col.key] || 0;
-          
-          // Apply shift filter
-          if (shiftFilter === 'total' || 
-              (shiftFilter === 'sang' && col.shift === 'morning') ||
-              (shiftFilter === 'chieu' && col.shift === 'afternoon')) {
-            if (value > maxValue) {
-              maxValue = value;
-            }
-          }
-        });
-        
-        maxValues.push(maxValue);
+      // Apply shift filter
+      if (shiftFilter === 'total' || 
+          (shiftFilter === 'sang' && col.shift === 'morning') ||
+          (shiftFilter === 'chieu' && col.shift === 'afternoon')) {
+        if (value > maxValue) {
+          maxValue = value;
+        }
       }
-    }
+    });
+    
+    maxValues.push(maxValue);
   });
   
   return { labels, maxValues };

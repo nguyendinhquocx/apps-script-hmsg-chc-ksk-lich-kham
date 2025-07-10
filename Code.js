@@ -128,6 +128,7 @@ function getColumnIndexes(headers) {
     'tenCongTy': ['ten cong ty', 'tên công ty'],
     'ngayBatDau': ['ngay bat dau kham', 'ngày bắt đầu khám'],
     'ngayKetThuc': ['ngay ket thuc kham', 'ngày kết thúc khám'],
+    'cacNgayKhamThucTe': ['cac ngay kham thuc te', 'các ngày khám thực tế'],
     'tongSoNgayKham': ['tong so ngay kham thuc te', 'tổng số ngày khám'],
     'trungBinhNgay': ['trung binh ngay', 'trung bình ngày'],
     'sang': ['trung binh ngay sang', 'sáng'],
@@ -209,6 +210,33 @@ function adjustForWorkingDays(startDate, endDate, totalDays) {
 }
 
 /**
+ * Parse ngày khám thực tế từ chuỗi mm/dd, mm/dd
+ */
+function parseActualExamDates(actualDatesStr, targetYear, targetMonth) {
+  if (!actualDatesStr || actualDatesStr.trim() === '') {
+    return [];
+  }
+  
+  const dates = [];
+  const dateStrings = actualDatesStr.split(',').map(s => s.trim());
+  
+  dateStrings.forEach(dateStr => {
+    if (dateStr.includes('/')) {
+      const [month, day] = dateStr.split('/').map(s => parseInt(s.trim()));
+      if (month && day && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        const date = new Date(targetYear, month - 1, day);
+        // Chỉ lấy ngày thuộc target month và không phải chủ nhật
+        if (date.getMonth() + 1 === targetMonth && !isSunday(date)) {
+          dates.push(date);
+        }
+      }
+    }
+  });
+  
+  return dates;
+}
+
+/**
  * 🔧 FIX: Xử lý dữ liệu với logic ĐÚNG cho cross-month scheduling
  */
 function processScheduleData(rawData, targetMonth, targetYear, showCompleted, shiftFilter = 'total', timeFilter = 'all') {
@@ -271,6 +299,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
         ngayBatDau: formatDate(record.ngayBatDau),
         ngayKetThuc: formatDate(record.ngayKetThuc),
         ngayKham: formatDate(record.ngayBatDau), // Thêm trường ngayKham
+        cacNgayKhamThucTe: record.cacNgayKhamThucTe || '', // Thêm trường cacNgayKhamThucTe
         // Cận lâm sàng - Sáng
         sieuAmBungSang: 0,
         khamPhuKhoaSang: 0,
@@ -317,6 +346,11 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       companyDetails[companyName].employee = record.tenNhanVien.trim();
     }
     
+    // Cập nhật cacNgayKhamThucTe nếu có dữ liệu mới
+    if (record.cacNgayKhamThucTe && record.cacNgayKhamThucTe.trim() !== '') {
+      companyDetails[companyName].cacNgayKhamThucTe = record.cacNgayKhamThucTe;
+    }
+    
     if (!companySchedules[companyName]) {
       companySchedules[companyName] = {};
       companyTotals[companyName] = 0;
@@ -326,15 +360,25 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     const targetMonthStart = new Date(targetYear, targetMonth - 1, 1);
     const targetMonthEnd = new Date(targetYear, targetMonth, 0);
     
-    // Cắt ngày bắt đầu và kết thúc theo target month
-    const effectiveStartDate = startDate < targetMonthStart ? targetMonthStart : startDate;
-    const effectiveEndDate = endDate > targetMonthEnd ? targetMonthEnd : endDate;
+    // 🆕 NEW: Ưu tiên sử dụng ngày khám thực tế nếu có dữ liệu
+    let actualWorkingDaysInMonth = [];
     
-    // Điều chỉnh lịch để tránh chủ nhật - chỉ trong target month
-    const workingDays = adjustForWorkingDays(effectiveStartDate, effectiveEndDate, tongSoNgayKham);
-    const actualWorkingDaysInMonth = workingDays.filter(day => 
-      day >= targetMonthStart && day <= targetMonthEnd
-    );
+    if (record.cacNgayKhamThucTe && record.cacNgayKhamThucTe.trim() !== '') {
+      // Sử dụng ngày khám thực tế từ cột 'cac ngay kham thuc te'
+      actualWorkingDaysInMonth = parseActualExamDates(record.cacNgayKhamThucTe, targetYear, targetMonth);
+      console.log(`📅 Sử dụng ngày khám thực tế cho ${companyName}: ${record.cacNgayKhamThucTe} -> ${actualWorkingDaysInMonth.length} ngày`);
+    } else {
+      // Logic cũ: Cắt ngày bắt đầu và kết thúc theo target month
+      const effectiveStartDate = startDate < targetMonthStart ? targetMonthStart : startDate;
+      const effectiveEndDate = endDate > targetMonthEnd ? targetMonthEnd : endDate;
+      
+      // Điều chỉnh lịch để tránh chủ nhật - chỉ trong target month
+      const workingDays = adjustForWorkingDays(effectiveStartDate, effectiveEndDate, tongSoNgayKham);
+      actualWorkingDaysInMonth = workingDays.filter(day => 
+        day >= targetMonthStart && day <= targetMonthEnd
+      );
+      console.log(`📅 Sử dụng logic cũ cho ${companyName}: ${actualWorkingDaysInMonth.length} ngày từ ${formatDate(effectiveStartDate)} đến ${formatDate(effectiveEndDate)}`);
+    }
     
     if (actualWorkingDaysInMonth.length === 0) return;
     
@@ -817,10 +861,16 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
     // Tạo object để lưu dữ liệu theo ngày
     const dailyClinicalData = {};
     
-    // Khởi tạo dữ liệu cho tất cả các ngày trong tháng
+    // Khởi tạo dữ liệu cho tất cả các ngày trong tháng (trừ Chủ nhật)
     for (let day = 1; day <= daysInMonth; day++) {
       const dateKey = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
       const dateDisplay = `${day.toString().padStart(2, '0')}/${currentMonth.toString().padStart(2, '0')}/${currentYear}`;
+      
+      // Kiểm tra xem ngày này có phải Chủ nhật không
+      const dateObj = new Date(currentYear, currentMonth - 1, day);
+      if (isSunday(dateObj)) {
+        continue; // Bỏ qua Chủ nhật
+      }
       
       dailyClinicalData[dateKey] = {
         date: dateDisplay,
@@ -858,32 +908,39 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
       }
       
       const details = companyDetails[companyName];
-      const ngayBatDau = details.ngayBatDau;
-      const ngayKetThuc = details.ngayKetThuc;
       
-      if (ngayBatDau && ngayKetThuc) {
-        // Chuyển đổi ngày bắt đầu và kết thúc
-        const startDate = parseDate(ngayBatDau);
-        const endDate = parseDate(ngayKetThuc);
+      // Ưu tiên sử dụng cột 'cacNgayKhamThucTe' nếu có dữ liệu
+      let actualWorkingDaysInMonth = [];
+      
+      if (details.cacNgayKhamThucTe && details.cacNgayKhamThucTe.trim() !== '') {
+        // Sử dụng ngày khám thực tế từ cột 'cacNgayKhamThucTe'
+        actualWorkingDaysInMonth = parseActualExamDates(details.cacNgayKhamThucTe, currentYear, currentMonth);
+      } else {
+        // Fallback: sử dụng logic cũ với ngayBatDau và ngayKetThuc
+        const ngayBatDau = details.ngayBatDau;
+        const ngayKetThuc = details.ngayKetThuc;
         
-        if (startDate && endDate) {
-          // Lặp qua tất cả các ngày trong khoảng thời gian khám
-          const currentDate = new Date(startDate);
-          while (currentDate <= endDate) {
-            const dateKey = formatDateKey(currentDate);
-            
-            if (dailyClinicalData[dateKey]) {
-              // Cộng dồn số liệu của công ty vào mỗi ngày trong khoảng thời gian
-              clinicalColumns.forEach(col => {
-                dailyClinicalData[dateKey][col.key] += details[col.key] || 0;
-              });
-            }
-            
-            // Chuyển sang ngày tiếp theo
-            currentDate.setDate(currentDate.getDate() + 1);
+        if (ngayBatDau && ngayKetThuc) {
+          const startDate = parseDate(ngayBatDau);
+          const endDate = parseDate(ngayKetThuc);
+          
+          if (startDate && endDate) {
+            actualWorkingDaysInMonth = adjustForWorkingDays(startDate, endDate, currentMonth, currentYear);
           }
         }
       }
+      
+      // Cộng dồn số liệu của công ty vào các ngày khám thực tế
+      actualWorkingDaysInMonth.forEach(workingDay => {
+        const dateKey = formatDateKey(workingDay);
+        
+        if (dailyClinicalData[dateKey]) {
+          // Cộng dồn số liệu của công ty vào ngày khám này
+          clinicalColumns.forEach(col => {
+            dailyClinicalData[dateKey][col.key] += details[col.key] || 0;
+          });
+        }
+      });
     });
     
     // Chuyển đổi object thành array và tính Max cho mỗi ngày - hiển thị tất cả ngày trong tháng
