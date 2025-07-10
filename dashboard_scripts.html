@@ -114,6 +114,9 @@ function loadData() {
     .withSuccessHandler(onDataLoaded)
     .withFailureHandler(onDataError)
     .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+  
+  // Cũng tải dữ liệu cận lâm sàng
+  loadClinicalData();
 }
 
 // Load data với current filters
@@ -992,25 +995,62 @@ function renderClinicalTable(clinicalData = null) {
 
   // Tạo các hàng dữ liệu theo ngày
   data.forEach(row => {
+    const hasData = row.max > 0;
+    const today = new Date();
+    const currentDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+    // Kiểm tra ngày hiện tại với nhiều format khác nhau
+    const isToday = row.date === currentDate || row.date.startsWith(currentDate) || row.dateKey === currentDate.replace('/', '');
+    
+    // Tìm giá trị lớn nhất cho sáng và chiều
+    const morningColumns = columns.filter(col => col.shift === 'morning');
+    const afternoonColumns = columns.filter(col => col.shift === 'afternoon');
+    
+    let maxMorningValue = 0;
+    let maxMorningKey = '';
+    let maxAfternoonValue = 0;
+    let maxAfternoonKey = '';
+    
+    morningColumns.forEach(col => {
+      const value = row[col.key] || 0;
+      if (value > maxMorningValue) {
+        maxMorningValue = value;
+        maxMorningKey = col.key;
+      }
+    });
+    
+    afternoonColumns.forEach(col => {
+      const value = row[col.key] || 0;
+      if (value > maxAfternoonValue) {
+        maxAfternoonValue = value;
+        maxAfternoonKey = col.key;
+      }
+    });
+    
     tableHTML += `
       <tr class="clinical-row">
-        <td class="clinical-data-cell company-cell">
+        <td class="clinical-data-cell company-cell ${hasData ? 'clickable' : ''} ${isToday ? 'today-highlight' : ''}" ${hasData ? `onclick="showDayDetail('${row.dateKey}', '${row.date}')"` : ''}>
           ${row.date}
         </td>
         <td class="clinical-data-cell people-cell">
-          <div class="clinical-data-inner has-data">${row.max}</div>
+          <div class="clinical-data-inner ${hasData ? 'has-data max-value' : 'empty'}">${hasData ? row.max : ''}</div>
         </td>
     `;
     
     columns.forEach(col => {
       const value = row[col.key] || 0;
       let cellClass = '';
+      const isMaxValue = (col.key === maxMorningKey && maxMorningValue > 0) || (col.key === maxAfternoonKey && maxAfternoonValue > 0);
+      
       if (value > 100) {
         cellClass = 'has-data high-volume';
       } else if (value > 0) {
         cellClass = 'has-data';
       } else {
         cellClass = 'empty';
+      }
+      
+      if (isMaxValue) {
+        cellClass += ' max-highlight';
       }
       
       tableHTML += `
@@ -1043,11 +1083,80 @@ renderDashboard = function(data) {
   // Gọi hàm render dashboard gốc
   originalRenderDashboard(data);
   
-  // Render bảng cận lâm sàng
-  renderClinicalTable();
+  // Render bảng cận lâm sàng nếu có dữ liệu
+  if (clinicalData && clinicalData.data) {
+    renderClinicalTable(clinicalData);
+  }
 };
 
 // Bỏ hàm showTotalDetail vì không còn hàng tổng
+
+// Hàm hiển thị chi tiết ngày khi click vào cột 'Ngày'
+function showDayDetail(dateKey, dateDisplay) {
+  if (!clinicalData || !clinicalData.data) {
+    alert('Không có dữ liệu để hiển thị');
+    return;
+  }
+  
+  // Tìm dữ liệu của ngày được click
+  const dayData = clinicalData.data.find(row => row.dateKey === dateKey);
+  
+  if (!dayData) {
+    alert('Không tìm thấy dữ liệu cho ngày này');
+    return;
+  }
+  
+  // Tạo danh sách các hạng mục có dữ liệu
+  const categoriesWithData = [];
+  clinicalData.columns.forEach(col => {
+    const value = dayData[col.key] || 0;
+    if (value > 0) {
+      categoriesWithData.push({
+        label: col.label,
+        value: value
+      });
+    }
+  });
+  
+  if (categoriesWithData.length === 0) {
+    alert(`Không có dữ liệu cận lâm sàng cho ngày ${dateDisplay}`);
+    return;
+  }
+  
+  // Sắp xếp theo số lượng giảm dần
+  categoriesWithData.sort((a, b) => b.value - a.value);
+  
+  let detailHTML = `
+    <div class="modal-header">
+      <h3>Chi tiết ngày ${dateDisplay}</h3>
+      <span class="close" onclick="closeDetailModal()">&times;</span>
+    </div>
+    <div class="modal-content">
+      <div class="detail-summary">
+        <p><strong>Tổng số hạng mục:</strong> ${categoriesWithData.length}</p>
+        <p><strong>Tổng số người:</strong> ${categoriesWithData.reduce((sum, item) => sum + item.value, 0)}</p>
+        <p><strong>Số lượng cao nhất:</strong> ${dayData.max}</p>
+      </div>
+      <div class="company-list">
+  `;
+  
+  categoriesWithData.forEach(item => {
+    detailHTML += `
+      <div class="company-item">
+        <span class="company-name">${item.label}</span>
+        <span class="company-count ${item.value > 100 ? 'high-volume' : 'normal'}">${item.value}</span>
+      </div>
+    `;
+  });
+  
+  detailHTML += `
+      </div>
+    </div>
+  `;
+  
+  document.getElementById('modalContent').innerHTML = detailHTML;
+  document.getElementById('detailModal').style.display = 'block';
+}
 
 // Hàm hiển thị chi tiết cột cận lâm sàng theo ngày
 function showClinicalColumnDetail(columnKey, columnLabel) {

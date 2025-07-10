@@ -981,8 +981,8 @@ button:focus, input:focus, select:focus {
   z-index: 14;
 }
 
-.clinical-header-sub .clinical-header:nth-child(10) {
-  border-right: 2px solid #2563eb;
+.clinical-header-sub .clinical-header:nth-child(11) {
+  border-right: 3px solid #4463eb;
 }
 
 .clinical-header {
@@ -1013,23 +1013,27 @@ button:focus, input:focus, select:focus {
   z-index: 10;
   background: #ffffff !important;
   border: 1px solid #e2e8f0;
-  border-bottom: 2px solid #555;
-  width: 300px;
-  min-width: 300px;
-  max-width: 300px;
+  border-bottom: 2px solid #000;
+  width: 160px;
+  min-width: 160px;
+  max-width: 160px;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .clinical-table .people-header,
 .clinical-table .people-cell {
   position: sticky;
-  left: 300px;
+  left: 160px;
   z-index: 10;
   background: #ffffff !important;
   border: 1px solid #e2e8f0;
-  border-bottom: 2px solid #555;
-  width: 80px;
-  min-width: 80px;
-  max-width: 80px;
+  border-bottom: 2px solid #000;
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .clinical-table .company-cell {
@@ -1037,11 +1041,14 @@ button:focus, input:focus, select:focus {
   font-weight: 500;
   color: #1a1a1a;
   border: none;
-  cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.clinical-table .company-cell:hover {
+.clinical-table .company-cell.clickable {
+  cursor: pointer;
+}
+
+.clinical-table .company-cell.clickable:hover {
   background: #f8fafc !important;
   color: #2563eb;
   font-weight: 600;
@@ -1099,9 +1106,7 @@ button:focus, input:focus, select:focus {
   cursor: pointer;
 }
 
-.clinical-data-cell.clickable:hover {
-  background-color: #f8fafc;
-}
+/* Removed hover effect for clinical data cells */
 
 .clinical-data-cell.has-data.high-volume:hover .clinical-data-inner {
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
@@ -1111,6 +1116,21 @@ button:focus, input:focus, select:focus {
   background: transparent;
   color: transparent;
   border: none;
+}
+
+.clinical-data-cell.today-highlight .clinical-data-inner {
+  background-color: #ffff99 !important;
+  font-weight: bold;
+}
+
+.clinical-data-cell.max-highlight .clinical-data-inner {
+  background-color: #fcf6bd !important;
+  font-weight: bold;
+}
+
+.clinical-data-inner.max-value {
+  color: #4273ed !important;
+  font-weight: bold;
 }
 
 /* Clinical total row */
@@ -1154,17 +1174,17 @@ button:focus, input:focus, select:focus {
 @media (max-width: 1024px) {
   .clinical-table .company-header,
   .clinical-table .company-cell {
-    width: 250px;
-    min-width: 250px;
-    max-width: 250px;
+    width: 140px;
+    min-width: 140px;
+    max-width: 140px;
   }
   
   .clinical-table .people-header,
   .clinical-table .people-cell {
-    left: 250px;
-    width: 70px;
-    min-width: 70px;
-    max-width: 70px;
+    left: 140px;
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
   }
   
   .clinical-header {

@@ -789,24 +789,24 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
     
     // Định nghĩa thứ tự cột theo yêu cầu (bỏ tổng siêu âm sáng và chiều)
     const clinicalColumns = [
-      { key: 'khamPhuKhoaSang', label: 'Khám phụ khoa sáng' },
-      { key: 'xQuangSang', label: 'X-quang sáng' },
-      { key: 'dienTamDoSang', label: 'Điện tâm đồ sáng' },
-      { key: 'sieuAmBungSang', label: 'Siêu âm bụng sáng' },
-      { key: 'sieuAmVuSang', label: 'Siêu âm vú sáng' },
-      { key: 'sieuAmGiapSang', label: 'Siêu âm giáp sáng' },
-      { key: 'sieuAmTimSang', label: 'Siêu âm tim sáng' },
-      { key: 'sieuAmDongMachCanhSang', label: 'Siêu âm động mạch cảnh sáng' },
-      { key: 'sieuAmDanHoiMoGanSang', label: 'Siêu âm đàn hồi mô gan sáng' },
-      { key: 'khamPhuKhoaChieu', label: 'Khám phụ khoa chiều' },
-      { key: 'xQuangChieu', label: 'X-quang chiều' },
-      { key: 'dienTamDoChieu', label: 'Điện tâm đồ chiều' },
-      { key: 'sieuAmBungChieu', label: 'Siêu âm bụng chiều' },
-      { key: 'sieuAmVuChieu', label: 'Siêu âm vú chiều' },
-      { key: 'sieuAmGiapChieu', label: 'Siêu âm giáp chiều' },
-      { key: 'sieuAmTimChieu', label: 'Siêu âm tim chiều' },
-      { key: 'sieuAmDongMachCanhChieu', label: 'Siêu âm động mạch cảnh chiều' },
-      { key: 'sieuAmDanHoiMoGanChieu', label: 'Siêu âm đàn hồi mô gan chiều' }
+      { key: 'khamPhuKhoaSang', label: 'Khám phụ khoa', shift: 'morning' },
+      { key: 'xQuangSang', label: 'X-quang', shift: 'morning' },
+      { key: 'dienTamDoSang', label: 'Điện tâm đồ', shift: 'morning' },
+      { key: 'sieuAmBungSang', label: 'Siêu âm bụng', shift: 'morning' },
+      { key: 'sieuAmVuSang', label: 'Siêu âm vú', shift: 'morning' },
+      { key: 'sieuAmGiapSang', label: 'Siêu âm giáp', shift: 'morning' },
+      { key: 'sieuAmTimSang', label: 'Siêu âm tim', shift: 'morning' },
+      { key: 'sieuAmDongMachCanhSang', label: 'Siêu âm động mạch cảnh', shift: 'morning' },
+      { key: 'sieuAmDanHoiMoGanSang', label: 'Siêu âm đàn hồi mô gan', shift: 'morning' },
+      { key: 'khamPhuKhoaChieu', label: 'Khám phụ khoa', shift: 'afternoon' },
+      { key: 'xQuangChieu', label: 'X-quang', shift: 'afternoon' },
+      { key: 'dienTamDoChieu', label: 'Điện tâm đồ', shift: 'afternoon' },
+      { key: 'sieuAmBungChieu', label: 'Siêu âm bụng', shift: 'afternoon' },
+      { key: 'sieuAmVuChieu', label: 'Siêu âm vú', shift: 'afternoon' },
+      { key: 'sieuAmGiapChieu', label: 'Siêu âm giáp', shift: 'afternoon' },
+      { key: 'sieuAmTimChieu', label: 'Siêu âm tim', shift: 'afternoon' },
+      { key: 'sieuAmDongMachCanhChieu', label: 'Siêu âm động mạch cảnh', shift: 'afternoon' },
+      { key: 'sieuAmDanHoiMoGanChieu', label: 'Siêu âm đàn hồi mô gan', shift: 'afternoon' }
     ];
     
     // Tạo dữ liệu theo ngày thay vì theo công ty
@@ -847,28 +847,38 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
       };
     }
     
-    // Tổng hợp dữ liệu từ tất cả các công ty theo ngày
+    // Tổng hợp dữ liệu từ tất cả các công ty theo khoảng thời gian khám
     Object.keys(companyDetails).forEach(companyName => {
       const details = companyDetails[companyName];
-      const ngayKham = details.ngayKham;
+      const ngayBatDau = details.ngayBatDau;
+      const ngayKetThuc = details.ngayKetThuc;
       
-      if (ngayKham) {
-        // Chuyển đổi ngày khám sang dateKey
-        const khamDate = parseDate(ngayKham);
-        if (khamDate) {
-          const dateKey = formatDateKey(khamDate);
-          
-          if (dailyClinicalData[dateKey]) {
-            // Cộng dồn số liệu của công ty vào ngày tương ứng
-            clinicalColumns.forEach(col => {
-              dailyClinicalData[dateKey][col.key] += details[col.key] || 0;
-            });
+      if (ngayBatDau && ngayKetThuc) {
+        // Chuyển đổi ngày bắt đầu và kết thúc
+        const startDate = parseDate(ngayBatDau);
+        const endDate = parseDate(ngayKetThuc);
+        
+        if (startDate && endDate) {
+          // Lặp qua tất cả các ngày trong khoảng thời gian khám
+          const currentDate = new Date(startDate);
+          while (currentDate <= endDate) {
+            const dateKey = formatDateKey(currentDate);
+            
+            if (dailyClinicalData[dateKey]) {
+              // Cộng dồn số liệu của công ty vào mỗi ngày trong khoảng thời gian
+              clinicalColumns.forEach(col => {
+                dailyClinicalData[dateKey][col.key] += details[col.key] || 0;
+              });
+            }
+            
+            // Chuyển sang ngày tiếp theo
+            currentDate.setDate(currentDate.getDate() + 1);
           }
         }
       }
     });
     
-    // Chuyển đổi object thành array và tính Max cho mỗi ngày
+    // Chuyển đổi object thành array và tính Max cho mỗi ngày - hiển thị tất cả ngày trong tháng
     Object.keys(dailyClinicalData).forEach(dateKey => {
       const dayData = dailyClinicalData[dateKey];
       
@@ -902,11 +912,8 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
         sieuAmDanHoiMoGanChieu: dayData.sieuAmDanHoiMoGanChieu
       };
       
-      // Chỉ thêm ngày nếu có ít nhất một hạng mục cận lâm sàng > 0
-      const hasClinicalData = clinicalColumns.some(col => clinicalRow[col.key] > 0);
-      if (hasClinicalData) {
-        clinicalData.push(clinicalRow);
-      }
+      // Hiển thị tất cả ngày trong tháng, không chỉ những ngày có dữ liệu
+      clinicalData.push(clinicalRow);
     });
     
     // Sắp xếp theo ngày tăng dần
