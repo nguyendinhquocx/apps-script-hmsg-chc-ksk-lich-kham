@@ -1,4 +1,9 @@
 <script>
+// Utility functions
+function isSunday(date) {
+  return date.getDay() === 0;
+}
+
 // Global state x.
 let currentMonth = new Date().getMonth() + 1;
 let currentYear = new Date().getFullYear();
@@ -1140,7 +1145,7 @@ function renderClinicalTable(clinicalData = null) {
           ${row.date}
         </td>
         <td class="clinical-data-cell people-cell">
-          <div class="clinical-data-inner ${hasData ? 'has-data max-value' : 'empty'}">${hasData ? row.max : ''}</div>
+          <div class="clinical-data-inner ${hasData && !isSunday ? 'has-data max-value' : 'empty'}">${hasData && !isSunday ? row.max : ''}</div>
         </td>
     `;
     
@@ -1209,6 +1214,45 @@ renderDashboard = function(data) {
 function showDayDetail(dateKey, dateDisplay) {
   console.log('showDayDetail called with:', dateKey, dateDisplay);
   console.log('clinicalData:', clinicalData);
+  
+  // Kiểm tra xem có phải ngày chủ nhật không
+  const dateParts = dateDisplay.split('/');
+  if (dateParts.length === 3) {
+    const dateObj = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+    if (isSunday(dateObj)) {
+      // Hiển thị quote vui cho ngày chủ nhật
+      const funQuotes = [
+        "Chủ nhật: đóng cửa bảo trì.",
+        // "☕ Hãy thưởng thức một tách cà phê và thư giãn!",
+        // "🎵 Âm nhạc và sách là những người bạn tốt nhất của ngày chủ nhật!",
+        // "🌸 Hãy dành thời gian cho gia đình và những người thân yêu!",
+        // "🧘‍♀️ Thiền định và yoga sẽ giúp bạn cân bằng tâm hồn!",
+        // "🎨 Sáng tạo và vẽ vời sẽ làm tâm hồn bạn phong phú hơn!",
+        // "📚 Đọc sách là cách tuyệt vời để mở rộng tầm nhìn!",
+        // "🌳 Đi dạo trong công viên và hòa mình với thiên nhiên!"
+      ];
+      
+      const randomQuote = funQuotes[Math.floor(Math.random() * funQuotes.length)];
+      
+      const quoteHTML = `
+        <div class="modal-header">
+          <h3>Ngày Chủ Nhật ${dateDisplay}</h3>
+          <span class="close" onclick="closeDetailModal()">&times;</span>
+        </div>
+        <div class="sunday-quote" style="text-align: center; padding: 40px 20px; font-size: 18px; line-height: 1.6; color: #2563eb;">
+          <div style="font-size: 48px; margin-bottom: 20px;">🌞</div>
+          <p style="margin: 0; font-weight: 500;">${randomQuote}</p>
+          <div style="margin-top: 30px; font-size: 14px; color: #64748b;">
+            <em>Relax!</em>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('modalBody').innerHTML = quoteHTML;
+      document.getElementById('detailModal').classList.add('show');
+      return;
+    }
+  }
   
   if (!clinicalData || !clinicalData.data) {
     console.log('No clinical data available');
@@ -1577,7 +1621,7 @@ function createClinicalMaxChart(data) {
 }
 
 function prepareChartData(data) {
-  if (!data || !data.timeline || !data.timeline.dates || !data.timeline.rows) {
+  if (!data || !data.timeline || !data.timeline.dates || !data.timeline.rows || !data.timeline.weekdays) {
     return { labels: [], totalPeople: [] };
   }
   
@@ -1594,10 +1638,14 @@ function prepareChartData(data) {
     });
   });
   
-  // Create chart data
+  // Create chart data, excluding Sundays
   data.timeline.dates.forEach((date, index) => {
-    labels.push(date.toString());
-    totalPeople.push(dailyTotals[index]);
+    const weekday = data.timeline.weekdays[index];
+    // Skip Sundays (CN = Chủ nhật)
+    if (weekday !== 'CN') {
+      labels.push(date.toString());
+      totalPeople.push(dailyTotals[index]);
+    }
   });
   
   return { labels, totalPeople };
@@ -1649,27 +1697,36 @@ function prepareClinicalChartData(data) {
   });
   
   filteredData.forEach(row => {
-    // Extract day from date (DD/MM/YYYY -> DD)
-    const dayPart = row.date.split('/')[0];
-    labels.push(dayPart);
-    
-    // Calculate max value for this day based on current shift filter
-    let maxValue = 0;
-    
-    data.columns.forEach(col => {
-      const value = row[col.key] || 0;
+    // Parse date to check if it's Sunday
+    const dateParts = row.date.split('/');
+    if (dateParts.length === 3) {
+      const dateObj = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
       
-      // Apply shift filter
-      if (shiftFilter === 'total' || 
-          (shiftFilter === 'sang' && col.shift === 'morning') ||
-          (shiftFilter === 'chieu' && col.shift === 'afternoon')) {
-        if (value > maxValue) {
-          maxValue = value;
-        }
+      // Skip Sundays
+      if (!isSunday(dateObj)) {
+        // Extract day from date (DD/MM/YYYY -> DD)
+        const dayPart = row.date.split('/')[0];
+        labels.push(dayPart);
+        
+        // Calculate max value for this day based on current shift filter
+        let maxValue = 0;
+        
+        data.columns.forEach(col => {
+          const value = row[col.key] || 0;
+          
+          // Apply shift filter
+          if (shiftFilter === 'total' || 
+              (shiftFilter === 'sang' && col.shift === 'morning') ||
+              (shiftFilter === 'chieu' && col.shift === 'afternoon')) {
+            if (value > maxValue) {
+              maxValue = value;
+            }
+          }
+        });
+        
+        maxValues.push(maxValue);
       }
-    });
-    
-    maxValues.push(maxValue);
+    }
   });
   
   return { labels, maxValues };
