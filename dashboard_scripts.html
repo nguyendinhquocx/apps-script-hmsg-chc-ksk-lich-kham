@@ -787,8 +787,18 @@ function showDailyTotalDetail(day, dayIndex) {
     });
   }
   
-  // Sắp xếp công ty theo số người khám (nhiều nhất lên đầu)
-  companiesWithAppointments.sort((a, b) => b.people - a.people);
+  // Sắp xếp theo nhân viên (A->Z) trước, sau đó theo số người khám giảm dần
+  companiesWithAppointments.sort((a, b) => {
+    // So sánh tên nhân viên trước
+    const employeeA = a.employee || '';
+    const employeeB = b.employee || '';
+    const employeeComparison = employeeA.localeCompare(employeeB, 'vi', { sensitivity: 'base' });
+    if (employeeComparison !== 0) {
+      return employeeComparison;
+    }
+    // Nếu nhân viên giống nhau, sắp xếp theo số người giảm dần
+    return b.people - a.people;
+  });
   
   // Nếu đang xem tổng (không filter), chia đều tổng số người khám thành hai phần bằng nhau
   if (shiftFilter === 'total') {
@@ -839,7 +849,7 @@ function showDailyTotalDetail(day, dayIndex) {
         <div class="company-list-item">
           <span class="company-name">${company.name}</span>
           <span class="company-people">${company.people} người</span>
-          ${company.employee ? `<span class="company-employee">NV: ${company.employee}</span>` : ''}
+          ${company.employee ? `<span class="company-employee">NV: ${getShortName(company.employee)}</span>` : ''}
         </div>
       `;
     });
@@ -873,6 +883,13 @@ document.addEventListener('keydown', function(event) {
     closeDetailModal();
   }
 });
+
+// Helper function to get short name (only last name)
+function getShortName(fullName) {
+  if (!fullName) return '';
+  const nameParts = fullName.trim().split(' ');
+  return nameParts[nameParts.length - 1]; // Lấy từ cuối cùng
+}
 
 // UI State Management
 function showLoading() {
@@ -1381,10 +1398,17 @@ function showClinicalColumnDetail(columnKey, columnLabel) {
     <div class="company-list">
   `;
   
+  // Lấy ngày hôm nay để highlight
+  const today = new Date();
+  const todayStr = String(today.getDate()).padStart(2, '0') + '/' + 
+                   String(today.getMonth() + 1).padStart(2, '0') + '/' + 
+                   today.getFullYear();
+  
   daysWithData.forEach(row => {
     const count = row[columnKey] || 0;
+    const isToday = row.date === todayStr;
     detailHTML += `
-      <div class="company-item">
+      <div class="company-item ${isToday ? 'today' : ''}">
         <span class="company-name">${row.date}</span>
         <span class="company-count ${count > 100 ? 'high-volume' : 'normal'}">${count}</span>
       </div>
@@ -1431,6 +1455,21 @@ function createTotalPeopleChart(data) {
   // Prepare data for chart
   const chartData = prepareChartData(data);
   
+  // Get current date
+  const today = new Date();
+  const currentDay = today.getDate();
+  
+  // Create dynamic colors and sizes based on current date
+  const pointColors = chartData.labels.map(label => {
+    const day = parseInt(label);
+    return day === currentDay ? '#22c55e' : '#3b82f6'; // Green for today, blue for others 22c55e
+  });
+  
+  const pointSizes = chartData.labels.map(label => {
+    const day = parseInt(label);
+    return day === currentDay ? 8 : 6; // Larger for today, normal size for others
+  });
+  
   totalPeopleChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -1438,16 +1477,16 @@ function createTotalPeopleChart(data) {
       datasets: [{
         label: 'Tổng người khám',
         data: chartData.totalPeople,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 3,
         fill: true,
         tension: 0.4,
-        pointBackgroundColor: '#2563eb',
+        pointBackgroundColor: pointColors,
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 8
+        pointRadius: pointSizes,
+        pointHoverRadius: pointSizes.map(size => size + 2)
       }]
     },
     options: {
@@ -1465,7 +1504,7 @@ function createTotalPeopleChart(data) {
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
           titleColor: '#ffffff',
           bodyColor: '#ffffff',
-          borderColor: '#2563eb',
+          borderColor: '#3b82f6',
           borderWidth: 1,
           cornerRadius: 8,
           displayColors: false,
@@ -1523,6 +1562,21 @@ function createClinicalMaxChart(data) {
   // Prepare data for clinical chart
   const chartData = prepareClinicalChartData(data);
   
+  // Get current date
+  const today = new Date();
+  const currentDay = today.getDate();
+  
+  // Create dynamic colors and sizes based on current date
+  const pointColors = chartData.labels.map(label => {
+    const day = parseInt(label);
+    return day === currentDay ? '#22c55e' : '#3b82f6'; // Green for today, blue for others
+  });
+  
+  const pointSizes = chartData.labels.map(label => {
+    const day = parseInt(label);
+    return day === currentDay ? 8 : 6; // Larger for today, normal size for others
+  });
+  
   clinicalMaxChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -1530,16 +1584,16 @@ function createClinicalMaxChart(data) {
       datasets: [{
         label: 'Max cận lâm sàng',
         data: chartData.maxValues,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 3,
         fill: true,
         tension: 0.4,
-        pointBackgroundColor: '#2563eb',
+        pointBackgroundColor: pointColors,
         pointBorderColor: '#ffffff',
         pointBorderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 8
+        pointRadius: pointSizes,
+        pointHoverRadius: pointSizes.map(size => size + 2)
       }]
     },
     options: {
@@ -1557,7 +1611,7 @@ function createClinicalMaxChart(data) {
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
           titleColor: '#ffffff',
           bodyColor: '#ffffff',
-          borderColor: '#caffbf',
+          borderColor: '#3b82f6',
           borderWidth: 1,
           cornerRadius: 8,
           displayColors: false,
