@@ -344,11 +344,11 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     if (shiftFilter === 'morning' || shiftFilter === 'sang') {
       // Tổng số người sáng trong cả giai đoạn = số người sáng mỗi ngày × số ngày khám trong tháng
       totalPeopleForPeriod = sang * actualWorkingDaysInMonth.length;
-      console.log(`🌅 Sáng - Company: ${companyName}, Per day: ${sang}, Days: ${actualWorkingDaysInMonth.length}, Total: ${totalPeopleForPeriod}`);
+      console.log(` Sáng - Company: ${companyName}, Per day: ${sang}, Days: ${actualWorkingDaysInMonth.length}, Total: ${totalPeopleForPeriod}`);
     } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
       // Tổng số người chiều trong cả giai đoạn = số người chiều mỗi ngày × số ngày khám trong tháng
       totalPeopleForPeriod = chieu * actualWorkingDaysInMonth.length;
-      console.log(`🌆 Chiều - Company: ${companyName}, Per day: ${chieu}, Days: ${actualWorkingDaysInMonth.length}, Total: ${totalPeopleForPeriod}`);
+      console.log(` Chiều - Company: ${companyName}, Per day: ${chieu}, Days: ${actualWorkingDaysInMonth.length}, Total: ${totalPeopleForPeriod}`);
     } else {
       // Tổng: Hiển thị tổng số người khám trong cả giai đoạn (không phải mỗi ngày)
       // Tính số người khám trong tháng target dựa trên tỷ lệ ngày khám

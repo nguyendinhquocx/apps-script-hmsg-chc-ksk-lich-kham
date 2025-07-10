@@ -747,6 +747,50 @@ body {
   white-space: nowrap;
 }
 
+/* Shift section styling */
+.shift-section {
+  margin-bottom: 20px;
+}
+
+.shift-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  border-left: 4px solid #2563eb;
+}
+
+.company-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.company-count {
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.company-count.normal {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.company-count.high-volume {
+  background: #fecaca;
+  color: #dc2626;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -1120,6 +1164,12 @@ button:focus, input:focus, select:focus {
   background-color: #ffff99 !important;
   font-weight: bold;
   border: 2px solid #ffd449 !important;
+}
+
+.clinical-data-cell.company-cell.today-highlight {
+  background-color: #fff3cd !important;
+  font-weight: bold;
+  border-left: 4px solid #ffd449 !important;
 }
 
 .clinical-data-cell.max-highlight .clinical-data-inner {
