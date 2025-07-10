@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lịch khám sức khoẻ công ty</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <?!= include('dashboard_styles'); ?>
 </head>
 <body>
@@ -91,6 +92,13 @@
         </div>
       </div>
 
+      <!-- Chart: Tổng người khám theo ngày -->
+      <div class="chart-wrapper">
+        <div class="chart-container">
+          <canvas id="totalPeopleChart" width="400" height="200"></canvas>
+        </div>
+      </div>
+
       <!-- Timeline -->
       <div class="timeline-wrapper">
         <div class="timeline-container">
@@ -117,6 +125,11 @@
       <!-- Clinical Examination Table -->
       <div class="clinical-wrapper">
         <h2 class="section-title">Khám cận lâm sàng</h2>
+        
+        <!-- Chart: Max cận lâm sàng theo ngày -->
+        <div class="chart-container clinical-chart">
+          <canvas id="clinicalMaxChart" width="400" height="200"></canvas>
+        </div>
         <div class="clinical-container">
           <!-- Bảng sẽ được tạo động bởi JavaScript -->
         </div>

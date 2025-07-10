@@ -1273,4 +1273,48 @@ button:focus, input:focus, select:focus {
     font-size: 12px;
   }
 }
+
+/* Chart Styling */
+.chart-wrapper {
+  margin: 32px 0;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.chart-container {
+  position: relative;
+  height: 300px;
+  margin-top: 16px;
+}
+
+.chart-container.clinical-chart {
+  margin-bottom: 24px;
+}
+
+.chart-wrapper .section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 16px 0;
+  letter-spacing: -0.02em;
+}
+
+/* Responsive chart styling */
+@media (max-width: 768px) {
+  .chart-wrapper {
+    margin: 24px 0;
+    padding: 16px;
+  }
+  
+  .chart-container {
+    height: 250px;
+  }
+  
+  .chart-wrapper .section-title {
+    font-size: 16px;
+  }
+}
 </style>

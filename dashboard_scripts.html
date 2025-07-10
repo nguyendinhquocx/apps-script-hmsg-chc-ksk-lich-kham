@@ -11,6 +11,10 @@ let dashboardData = null;
 let originalData = null; // Keep original unfiltered data
 let clinicalData = null;
 
+// Chart instances
+let totalPeopleChart = null;
+let clinicalMaxChart = null;
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
   initializeApp();
@@ -175,6 +179,9 @@ function onDataLoaded(data) {
   // Render dashboard trực tiếp với data đã filtered từ server
   renderDashboard(dashboardData);
   showDashboard();
+  
+  // Update charts
+  updateCharts();
 }
 
 function onRefreshDataLoaded(data) {
@@ -228,6 +235,9 @@ function onFilterDataLoaded(data) {
   
   renderDashboard(dashboardData);
   showDashboard();
+  
+  // Update charts
+  updateCharts();
 }
 
 // Calculate statistics based on actual filtered data from server
@@ -952,6 +962,9 @@ function onClinicalDataLoaded(data) {
   console.log('clinicalData saved:', clinicalData);
   
   renderClinicalTable(data);
+  
+  // Update charts
+  updateCharts();
 }
 
 function renderClinicalTable(clinicalData = null) {
@@ -1353,6 +1366,301 @@ function applyFilters() {
     .withSuccessHandler(onClinicalDataLoaded)
     .withFailureHandler(onDataError)
     .getClinicalData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+}
+
+// Chart Functions
+function createTotalPeopleChart(data) {
+  const ctx = document.getElementById('totalPeopleChart');
+  if (!ctx) return;
+  
+  // Destroy existing chart
+  if (totalPeopleChart) {
+    totalPeopleChart.destroy();
+  }
+  
+  // Prepare data for chart
+  const chartData = prepareChartData(data);
+  
+  totalPeopleChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartData.labels,
+      datasets: [{
+        label: 'Tổng người khám',
+        data: chartData.totalPeople,
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#2563eb',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: '#2563eb',
+          borderWidth: 1,
+          cornerRadius: 8,
+          displayColors: false,
+          callbacks: {
+            title: function(context) {
+              return 'Ngày ' + context[0].label;
+            },
+            label: function(context) {
+              return 'Tổng người khám: ' + context.parsed.y + ' người';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: '#64748b',
+            font: {
+              size: 12
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)'
+          },
+          ticks: {
+            color: '#64748b',
+            font: {
+              size: 12
+            },
+            callback: function(value) {
+              return value + ' người';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function createClinicalMaxChart(data) {
+  const ctx = document.getElementById('clinicalMaxChart');
+  if (!ctx || !data || !data.data) return;
+  
+  // Destroy existing chart
+  if (clinicalMaxChart) {
+    clinicalMaxChart.destroy();
+  }
+  
+  // Prepare data for clinical chart
+  const chartData = prepareClinicalChartData(data);
+  
+  clinicalMaxChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: chartData.labels,
+      datasets: [{
+        label: 'Max cận lâm sàng',
+        data: chartData.maxValues,
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#2563eb',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        intersect: false,
+        mode: 'index'
+      },
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: '#caffbf',
+          borderWidth: 1,
+          cornerRadius: 8,
+          displayColors: false,
+          callbacks: {
+            title: function(context) {
+              return 'Ngày ' + context[0].label;
+            },
+            label: function(context) {
+              return 'Max cận lâm sàng: ' + context.parsed.y + ' người';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false
+          },
+          ticks: {
+            color: '#64748b',
+            font: {
+              size: 12
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)'
+          },
+          ticks: {
+            color: '#64748b',
+            font: {
+              size: 12
+            },
+            callback: function(value) {
+              return value + ' người';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function prepareChartData(data) {
+  if (!data || !data.timeline || !data.timeline.dates || !data.timeline.rows) {
+    return { labels: [], totalPeople: [] };
+  }
+  
+  const labels = [];
+  const totalPeople = [];
+  
+  // Calculate daily totals from timeline data
+  const dailyTotals = new Array(data.timeline.dates.length).fill(0);
+  
+  // Sum up all companies for each day
+  data.timeline.rows.forEach(row => {
+    row.data.forEach((value, dayIndex) => {
+      dailyTotals[dayIndex] += value;
+    });
+  });
+  
+  // Create chart data
+  data.timeline.dates.forEach((date, index) => {
+    labels.push(date.toString());
+    totalPeople.push(dailyTotals[index]);
+  });
+  
+  return { labels, totalPeople };
+}
+
+function prepareClinicalChartData(data) {
+  if (!data || !data.data || !data.columns) {
+    return { labels: [], maxValues: [] };
+  }
+  
+  const labels = [];
+  const maxValues = [];
+  
+  // Filter and sort data based on current filters
+  let filteredData = data.data.slice();
+  
+  // Apply time filter
+  if (timeFilter && timeFilter !== 'all') {
+    const today = new Date();
+    filteredData = filteredData.filter(row => {
+      switch (timeFilter) {
+        case 'today':
+          const currentDate = today.getDate().toString().padStart(2, '0') + '/' + 
+                             (today.getMonth() + 1).toString().padStart(2, '0') + '/' + 
+                             today.getFullYear();
+          return row.date === currentDate;
+        case 'week':
+          const weekAgo = new Date();
+          weekAgo.setDate(today.getDate() - 7);
+          const dateParts = row.date.split('/');
+          if (dateParts.length === 3) {
+            const rowDate = new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+            return rowDate >= weekAgo && rowDate <= today;
+          }
+          return false;
+        case 'month':
+          return true;
+        default:
+          return true;
+      }
+    });
+  }
+  
+  // Sort by date
+  filteredData.sort((a, b) => {
+    const dateA = parseInt(a.dateKey);
+    const dateB = parseInt(b.dateKey);
+    return dateA - dateB;
+  });
+  
+  filteredData.forEach(row => {
+    // Extract day from date (DD/MM/YYYY -> DD)
+    const dayPart = row.date.split('/')[0];
+    labels.push(dayPart);
+    
+    // Calculate max value for this day based on current shift filter
+    let maxValue = 0;
+    
+    data.columns.forEach(col => {
+      const value = row[col.key] || 0;
+      
+      // Apply shift filter
+      if (shiftFilter === 'total' || 
+          (shiftFilter === 'sang' && col.shift === 'morning') ||
+          (shiftFilter === 'chieu' && col.shift === 'afternoon')) {
+        if (value > maxValue) {
+          maxValue = value;
+        }
+      }
+    });
+    
+    maxValues.push(maxValue);
+  });
+  
+  return { labels, maxValues };
+}
+
+// Update charts when data changes
+function updateCharts() {
+  if (dashboardData) {
+    createTotalPeopleChart(dashboardData);
+  }
+  
+  if (clinicalData) {
+    createClinicalMaxChart(clinicalData);
+  }
 }
 
 </script>
