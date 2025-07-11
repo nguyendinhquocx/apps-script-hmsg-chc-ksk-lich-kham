@@ -1314,6 +1314,20 @@ button:focus, input:focus, select:focus {
   letter-spacing: -0.02em;
 }
 
+/* Highlight the entire column of the current day in the main table */
+.today-column {
+  background: #f8f9fa !important;
+}
+
+/* Highlight the entire row of the current day in the clinical table */
+.today-row {
+  background: #f8f9fa !important;
+}
+
+.today-row .today-column {
+  background: #f8f9fa !important;
+}
+
 /* Responsive chart styling */
 @media (max-width: 768px) {
   .chart-wrapper {

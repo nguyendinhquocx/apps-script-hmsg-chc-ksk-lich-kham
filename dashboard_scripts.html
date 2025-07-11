@@ -432,6 +432,13 @@ function renderTimeline(timeline) {
     if (weekday === 'CN' || weekday === 'T7') {
       td.classList.add('weekend');
     }
+    
+    // Mark today column for total row
+    const timelineDate = timeline.dates[dayIndex];
+    if (isCurrentMonth && timelineDate === todayDate) {
+      td.classList.add('today-column');
+    }
+    
     td.appendChild(inner);
     totalTr.appendChild(td);
   });
@@ -506,6 +513,12 @@ function renderTimeline(timeline) {
       const weekday = timeline.weekdays[dayIndex];
       if (weekday === 'CN' || weekday === 'T7') {
         td.classList.add('weekend');
+      }
+      
+      // Mark today column for data rows
+      const timelineDate = timeline.dates[dayIndex];
+      if (isCurrentMonth && timelineDate === todayDate) {
+        td.classList.add('today-column');
       }
       
       td.appendChild(inner);
@@ -1146,11 +1159,11 @@ function renderClinicalTable(clinicalData = null) {
     });
     
     tableHTML += `
-      <tr class="clinical-row">
+      <tr class="clinical-row ${isToday ? 'today-row' : ''}">
         <td class="clinical-data-cell company-cell ${hasData ? 'clickable' : ''} ${isToday ? 'today-highlight' : ''}" ${hasData ? `onclick="showDayDetail('${row.dateKey}', '${row.date}')"` : ''}>
           ${row.date}
         </td>
-        <td class="clinical-data-cell people-cell">
+        <td class="clinical-data-cell people-cell ${isToday ? 'today-column' : ''}">
           <div class="clinical-data-inner ${hasData ? 'has-data max-value' : 'empty'}">${hasData ? row.max : ''}</div>
         </td>
     `;
@@ -1170,6 +1183,11 @@ function renderClinicalTable(clinicalData = null) {
       
       if (isMaxValue) {
         cellClass += ' max-highlight';
+      }
+      
+      // Thêm class today-column cho tất cả các cột thuộc ngày hiện tại
+      if (isToday) {
+        cellClass += ' today-column';
       }
       
       tableHTML += `
