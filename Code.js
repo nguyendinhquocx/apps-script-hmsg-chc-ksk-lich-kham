@@ -28,14 +28,14 @@ function include(filename) {
 /**
  * Lấy dữ liệu với tháng cụ thể và filter trạng thái
  */
-function getScheduleData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all') {
+function getScheduleData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all', showGold = false) {
   try {
     const currentDate = new Date();
     const targetMonth = month || (currentDate.getMonth() + 1);
     const targetYear = year || currentDate.getFullYear();
     
-    // Cache key phải include shiftFilter và timeFilter để tránh cache sai
-    const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}_${searchCompany}_${filterEmployee}_${shiftFilter}_${timeFilter}`;
+    // Cache key phải include shiftFilter, timeFilter và showGold để tránh cache sai
+    const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}_${searchCompany}_${filterEmployee}_${shiftFilter}_${timeFilter}_${showGold}`;
     const cache = CacheService.getScriptCache();
     const cachedData = cache.get(cacheKey);
     
@@ -44,7 +44,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
       return JSON.parse(cachedData);
     }
 
-    console.log(`Lấy dữ liệu tháng ${targetMonth}/${targetYear}, showCompleted: ${showCompleted}, shiftFilter: ${shiftFilter}, timeFilter: ${timeFilter}`);
+    console.log(`Lấy dữ liệu tháng ${targetMonth}/${targetYear}, showCompleted: ${showCompleted}, shiftFilter: ${shiftFilter}, timeFilter: ${timeFilter}, showGold: ${showGold}`);
     
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
     const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
@@ -78,7 +78,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
       return record;
     });
 
-    // Lọc theo search và employee
+    // Lọc theo search, employee và gold
     let filteredData = rawData.filter(record => {
       if (!record.tenCongTy || !record.ngayBatDau || !record.ngayKetThuc || !record.soNguoiKham) {
         return false;
@@ -94,13 +94,29 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
         return false;
       }
       
+      // Gold filter
+      const goldValue = (record.gold || '').toString().toLowerCase().trim();
+      const hasGoldMark = goldValue === 'x' || goldValue === 'X';
+      
+      if (showGold) {
+        // Nếu showGold = true, chỉ hiển thị những công ty có đánh dấu gold
+        if (!hasGoldMark) {
+          return false;
+        }
+      } else {
+        // Nếu showGold = false, ẩn những công ty có đánh dấu gold
+        if (hasGoldMark) {
+          return false;
+        }
+      }
+      
       return true;
     });
 
     console.log(`Dữ liệu sau filter: ${filteredData.length} records`);
 
-    // Tổng hợp dữ liệu với shiftFilter và timeFilter
-    const processedData = processScheduleData(filteredData, targetMonth, targetYear, showCompleted, shiftFilter, timeFilter);
+    // Tổng hợp dữ liệu với shiftFilter, timeFilter và showGold
+    const processedData = processScheduleData(filteredData, targetMonth, targetYear, showCompleted, shiftFilter, timeFilter, showGold);
     
     // Cache kết quả
     cache.put(cacheKey, JSON.stringify(processedData), CONFIG.CACHE_DURATION);
@@ -136,6 +152,7 @@ function getColumnIndexes(headers) {
     'soNguoiKham': ['so nguoi kham', 'số người khám'],
     'trangThaiKham': ['trang thai kham', 'trạng thái khám'],
     'tenNhanVien': ['ten nhan vien', 'tên nhân viên'],
+    'gold': ['gold'],
     // Cận lâm sàng - Sáng
     'sieuAmBungSang': ['sieu am bung sang'],
     'khamPhuKhoaSang': ['kham phu khoa sang'],
@@ -239,7 +256,7 @@ function parseActualExamDates(actualDatesStr, targetYear, targetMonth) {
 /**
  * 🔧 FIX: Xử lý dữ liệu với logic ĐÚNG cho cross-month scheduling
  */
-function processScheduleData(rawData, targetMonth, targetYear, showCompleted, shiftFilter = 'total', timeFilter = 'all') {
+function processScheduleData(rawData, targetMonth, targetYear, showCompleted, shiftFilter = 'total', timeFilter = 'all', showGold = false) {
   const companySchedules = {};
   const dailyTotals = {};
   const companyStatus = {};
@@ -248,7 +265,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
   const companyDetails = {};
   const employees = new Set();
   
-  console.log(`🔧 Processing data with shiftFilter: ${shiftFilter}`);
+  console.log(`🔧 Processing data with shiftFilter: ${shiftFilter}, showGold: ${showGold}`);
   
   // Lọc dữ liệu có giao thoa với tháng target
   const targetMonthData = rawData.filter(record => {
@@ -819,10 +836,10 @@ function getCurrentUser() {
 /**
  * Lấy dữ liệu cận lâm sàng cho bảng hiển thị theo ngày
  */
-function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all') {
+function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all', showGold = false) {
   try {
-    // Lấy dữ liệu với tham số showCompleted được truyền vào
-    const scheduleData = getScheduleData(month, year, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter);
+    // Lấy dữ liệu với tham số showCompleted và showGold được truyền vào
+    const scheduleData = getScheduleData(month, year, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
     
     if (!scheduleData.success) {
       return scheduleData;
