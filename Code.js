@@ -34,8 +34,12 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
     const targetMonth = month || (currentDate.getMonth() + 1);
     const targetYear = year || currentDate.getFullYear();
     
-    // Cache key phải include shiftFilter, timeFilter và showGold để tránh cache sai
-    const cacheKey = `scheduleData_${targetYear}_${targetMonth}_${showCompleted}_${searchCompany}_${filterEmployee}_${shiftFilter}_${timeFilter}_${showGold}`;
+    // Tối ưu cache key - tách thành nhiều level để tăng hiệu quả cache
+    const baseCacheKey = `scheduleData_${targetYear}_${targetMonth}`;
+    const filterCacheKey = `${baseCacheKey}_${showCompleted}_${showGold}`;
+    const searchCacheKey = searchCompany ? `_search_${searchCompany.substring(0, 10)}` : '';
+    const employeeCacheKey = filterEmployee ? `_emp_${filterEmployee.substring(0, 10)}` : '';
+    const cacheKey = `${filterCacheKey}${searchCacheKey}${employeeCacheKey}_${shiftFilter}_${timeFilter}`;
     const cache = CacheService.getScriptCache();
     const cachedData = cache.get(cacheKey);
     
@@ -258,28 +262,62 @@ function parseActualExamDates(actualDatesStr, targetYear, targetMonth) {
  * 🔧 FIX: Xử lý dữ liệu với logic ĐÚNG cho cross-month scheduling
  */
 function processScheduleData(rawData, targetMonth, targetYear, showCompleted, shiftFilter = 'total', timeFilter = 'all', showGold = false) {
-  const companySchedules = {};
-  const dailyTotals = {};
-  const companyStatus = {};
-  const companyTotals = {};
-  const companyEmployees = {};
-  const companyDetails = {};
+  // Tối ưu: Sử dụng Map thay vì Object để tăng hiệu suất
+  const companySchedules = new Map();
+  const dailyTotals = new Map();
+  const companyStatus = new Map();
+  const companyTotals = new Map();
+  const companyEmployees = new Map();
+  const companyDetails = new Map();
   const employees = new Set();
+  
+  // Early return nếu không có dữ liệu
+  if (!rawData || rawData.length === 0) {
+    return {
+      companySchedules: {},
+      dailyTotals: {},
+      companyStatus: {},
+      companyTotals: {},
+      companyEmployees: {},
+      companyDetails: {},
+      employees: []
+    };
+  }
   
   console.log(`🔧 Processing data with shiftFilter: ${shiftFilter}, showGold: ${showGold}`);
   
-  // Lọc dữ liệu có giao thoa với tháng target
-  const targetMonthData = rawData.filter(record => {
+  // Tối ưu: Pre-calculate target month boundaries
+  const targetMonthStart = new Date(targetYear, targetMonth - 1, 1);
+  const targetMonthEnd = new Date(targetYear, targetMonth, 0);
+  
+  // Lọc dữ liệu có giao thoa với tháng target với early returns
+  const targetMonthData = [];
+  for (let i = 0; i < rawData.length; i++) {
+    const record = rawData[i];
     const startDate = parseDate(record.ngayBatDau);
     const endDate = parseDate(record.ngayKetThuc);
     
-    if (!startDate || !endDate) return false;
+    // Early continue nếu không có ngày hợp lệ
+    if (!startDate || !endDate) continue;
     
-    const targetMonthStart = new Date(targetYear, targetMonth - 1, 1);
-    const targetMonthEnd = new Date(targetYear, targetMonth, 0);
+    // Early continue nếu không giao thoa với target month
+    if (startDate > targetMonthEnd || endDate < targetMonthStart) continue;
     
-    return (startDate <= targetMonthEnd && endDate >= targetMonthStart);
-  });
+    targetMonthData.push(record);
+  }
+  
+  // Early return nếu không có dữ liệu trong tháng target
+  if (targetMonthData.length === 0) {
+    return {
+      companySchedules: {},
+      dailyTotals: {},
+      companyStatus: {},
+      companyTotals: {},
+      companyEmployees: {},
+      companyDetails: {},
+      employees: []
+    };
+  }
 
   // Xử lý từng record
   targetMonthData.forEach(record => {
@@ -294,21 +332,21 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     
     if (!startDate || !endDate || soNguoiKham === 0) return;
     
-    // Thu thập nhân viên và map với công ty
+    // Thu thập nhân viên và map với công ty - tối ưu với Map
     if (record.tenNhanVien) {
       const employeeName = record.tenNhanVien.trim();
       employees.add(employeeName);
-      if (!companyEmployees[companyName]) {
-        companyEmployees[companyName] = employeeName;
+      if (!companyEmployees.has(companyName)) {
+        companyEmployees.set(companyName, employeeName);
       }
     }
     
-    // Lưu trạng thái công ty và thông tin sáng/chiều
-    companyStatus[companyName] = trangThaiKham;
+    // Lưu trạng thái công ty và thông tin sáng/chiều - tối ưu với Map
+    companyStatus.set(companyName, trangThaiKham);
     
-    // Cập nhật thông tin sáng/chiều và cận lâm sàng
-    if (!companyDetails[companyName]) {
-      companyDetails[companyName] = {
+    // Cập nhật thông tin sáng/chiều và cận lâm sàng - tối ưu với Map
+    if (!companyDetails.has(companyName)) {
+      companyDetails.set(companyName, {
         sang: 0,
         chieu: 0,
         tongNguoi: 0,
@@ -339,13 +377,15 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
         sieuAmTimChieu: 0,
         sieuAmDongMachCanhChieu: 0,
         sieuAmDanHoiMoGanChieu: 0
-      };
+      });
     }
     
-    companyDetails[companyName].sang += sang;
-    companyDetails[companyName].chieu += chieu;
-    companyDetails[companyName].tongNguoi += soNguoiKham;
-    companyDetails[companyName].tongSoNgay += tongSoNgayKham;
+    // Tối ưu: Get reference một lần để tránh multiple Map lookups
+    const companyDetail = companyDetails.get(companyName);
+    companyDetail.sang += sang;
+    companyDetail.chieu += chieu;
+    companyDetail.tongNguoi += soNguoiKham;
+    companyDetail.tongSoNgay += tongSoNgayKham;
     
     // Cập nhật dữ liệu cận lâm sàng
     const clinicalFields = [
@@ -355,29 +395,31 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       'sieuAmVuChieu', 'sieuAmGiapChieu', 'sieuAmTimChieu', 'sieuAmDongMachCanhChieu', 'sieuAmDanHoiMoGanChieu'
     ];
     
-    clinicalFields.forEach(field => {
+    // Tối ưu: Batch update clinical fields
+    for (let i = 0; i < clinicalFields.length; i++) {
+      const field = clinicalFields[i];
       if (record[field] !== undefined) {
-        companyDetails[companyName][field] += record[field];
+        companyDetail[field] += record[field];
       }
-    });
+    }
     
-    if (!companyDetails[companyName].employee && record.tenNhanVien) {
-      companyDetails[companyName].employee = record.tenNhanVien.trim();
+    if (!companyDetail.employee && record.tenNhanVien) {
+      companyDetail.employee = record.tenNhanVien.trim();
     }
     
     // Cập nhật cacNgayKhamThucTe nếu có dữ liệu mới
     if (record.cacNgayKhamThucTe && record.cacNgayKhamThucTe.trim() !== '') {
-      companyDetails[companyName].cacNgayKhamThucTe = record.cacNgayKhamThucTe;
+      companyDetail.cacNgayKhamThucTe = record.cacNgayKhamThucTe;
     }
     
     // Cập nhật ngayLayMau nếu có dữ liệu mới
     if (record.ngayLayMau && typeof record.ngayLayMau === 'string' && record.ngayLayMau.trim() !== '') {
-      companyDetails[companyName].ngayLayMau = record.ngayLayMau;
+      companyDetail.ngayLayMau = record.ngayLayMau;
     }
     
-    if (!companySchedules[companyName]) {
-      companySchedules[companyName] = {};
-      companyTotals[companyName] = 0;
+    if (!companySchedules.has(companyName)) {
+      companySchedules.set(companyName, {});
+      companyTotals.set(companyName, 0);
     }
     
     // 🔧 FIX: Cross-month logic - chỉ tính ngày trong target month
@@ -433,20 +475,29 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       
       // Đảm bảo ngày thuộc target month
       if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
-        companySchedules[companyName][dateKey] = 
-          (companySchedules[companyName][dateKey] || 0) + peoplePerDay;
+        const companyData = companySchedules.get(companyName) || {};
+        companyData[dateKey] = (companyData[dateKey] || 0) + peoplePerDay;
+        companySchedules.set(companyName, companyData);
         
         dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peoplePerDay;
       }
     });
     
     // Cập nhật tổng công ty với tổng số người trong cả giai đoạn
-    companyTotals[companyName] = (companyTotals[companyName] || 0) + totalPeopleForPeriod;
+    const currentTotal = companyTotals.get(companyName) || 0;
+    companyTotals.set(companyName, currentTotal + totalPeopleForPeriod);
   });
+  
+  // Convert Maps back to Objects for compatibility
+  let companySchedulesObj = Object.fromEntries(companySchedules);
+  let companyTotalsObj = Object.fromEntries(companyTotals);
+  let companyDetailsObj = Object.fromEntries(companyDetails);
+  const companyEmployeesObj = Object.fromEntries(companyEmployees);
+  const companyStatusObj = Object.fromEntries(companyStatus);
   
   // Tính thống kê trạng thái
   const statusCounts = { completed: 0, pending: 0 };
-  Object.values(companyStatus).forEach(status => {
+  companyStatus.forEach(status => {
     const statusLower = status.toLowerCase().trim();
     if (statusLower === 'đã khám xong' || statusLower === 'da kham xong') {
       statusCounts.completed++;
@@ -460,10 +511,10 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset time để so sánh chỉ ngày
     
-    Object.keys(companySchedules).forEach(companyName => {
-      const status = companyStatus[companyName] || '';
+    const companiesToRemove = [];
+    companyStatus.forEach((status, companyName) => {
       const statusLower = status.toLowerCase().trim();
-      const companyDetail = companyDetails[companyName];
+      const companyDetail = companyDetails.get(companyName);
       
       // Kiểm tra trạng thái "Đã khám xong" HOẶC ngày kết thúc < hôm nay
       let shouldRemove = false;
@@ -478,17 +529,27 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       }
       
       if (shouldRemove) {
-        delete companySchedules[companyName];
-        delete companyTotals[companyName];
-        delete companyDetails[companyName]; // Cũng xóa khỏi companyDetails
+        companiesToRemove.push(companyName);
       }
     });
+    
+    // Remove companies from Maps
+    companiesToRemove.forEach(companyName => {
+      companySchedules.delete(companyName);
+      companyTotals.delete(companyName);
+      companyDetails.delete(companyName);
+    });
+    
+    // Update converted objects
+    companySchedulesObj = Object.fromEntries(companySchedules);
+    companyTotalsObj = Object.fromEntries(companyTotals);
+    companyDetailsObj = Object.fromEntries(companyDetails);
   }
 
   // Áp dụng time filter (ngày, tuần, tháng)
-  const filteredCompanySchedules = applyTimeFilter(companySchedules, timeFilter);
+  const filteredCompanySchedules = applyTimeFilter(companySchedulesObj, timeFilter);
 
-  const timeline = createTimelineData(filteredCompanySchedules, dailyTotals, companyTotals, targetMonth, targetYear, companyEmployees, companyDetails);
+  const timeline = createTimelineData(filteredCompanySchedules, dailyTotals, companyTotalsObj, targetMonth, targetYear, companyEmployeesObj, companyDetailsObj);
 
   // Tính lại statistics dựa trên filtered data
   const filteredStats = calculateFilteredStats(timeline, shiftFilter);
@@ -496,7 +557,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
   // Tính lại statusCounts dựa trên filtered companies để tránh số âm
   const filteredStatusCounts = { completed: 0, pending: 0 };
   Object.keys(filteredCompanySchedules).forEach(companyName => {
-    const status = companyStatus[companyName] || '';
+    const status = companyStatusObj[companyName] || '';
     const statusLower = status.toLowerCase().trim();
     if (statusLower === 'đã khám xong' || statusLower === 'da kham xong') {
       filteredStatusCounts.completed++;
@@ -508,7 +569,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
   return {
     success: true,
     timeline: timeline,
-    companyDetails: companyDetails,
+    companyDetails: companyDetailsObj,
     summary: {
       totalCompanies: Object.keys(filteredCompanySchedules).length,
       completedCompanies: filteredStatusCounts.completed,
@@ -660,70 +721,51 @@ function applyTimeFilter(companySchedules, timeFilter) {
   const today = new Date();
   const currentDateKey = formatDateKey(today);
   
-  // Tính ngày đầu tuần (chủ nhật)
-  const currentDay = today.getDay(); // 0 = CN, 1 = T2, ...
-  const daysSinceSunday = currentDay; // Số ngày từ chủ nhật đến hôm nay
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() - daysSinceSunday);
+  // Tối ưu: Sử dụng Set để tìm kiếm nhanh hơn
+  let targetDatesSet;
   
-  // Tính ngày cuối tuần (thứ 7)
-  const nextSunday = new Date(sunday);
-  nextSunday.setDate(sunday.getDate() + 6);
-  
-  // Tạo mảng các ngày trong tuần hiện tại (từ chủ nhật đến thứ 7)
-  const currentWeekDates = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(sunday);
-    date.setDate(sunday.getDate() + i);
-    currentWeekDates.push(formatDateKey(date));
-  }
-  
-  // Tính ngày đầu tháng và cuối tháng hiện tại
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-  const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
-  
-  // Tạo mảng các ngày trong tháng hiện tại
-  const currentMonthDates = [];
-  const tempDate = new Date(firstDayOfMonth);
-  while (tempDate <= lastDayOfMonth) {
-    currentMonthDates.push(formatDateKey(tempDate));
-    tempDate.setDate(tempDate.getDate() + 1);
+  if (timeFilter === 'today') {
+    targetDatesSet = new Set([currentDateKey]);
+  } else if (timeFilter === 'week') {
+    // Tính ngày đầu tuần (chủ nhật)
+    const currentDay = today.getDay(); // 0 = CN, 1 = T2, ...
+    const daysSinceSunday = currentDay; // Số ngày từ chủ nhật đến hôm nay
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - daysSinceSunday);
+    
+    // Tạo Set các ngày trong tuần hiện tại (từ chủ nhật đến thứ 7)
+    targetDatesSet = new Set();
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(sunday);
+      date.setDate(sunday.getDate() + i);
+      targetDatesSet.add(formatDateKey(date));
+    }
+  } else if (timeFilter === 'month') {
+    // Tính ngày đầu tháng và cuối tháng hiện tại
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0);
+    
+    // Tạo Set các ngày trong tháng hiện tại
+    targetDatesSet = new Set();
+    const tempDate = new Date(firstDayOfMonth);
+    while (tempDate <= lastDayOfMonth) {
+      targetDatesSet.add(formatDateKey(tempDate));
+      tempDate.setDate(tempDate.getDate() + 1);
+    }
   }
   
   const filteredSchedules = {};
   
-  // Lọc theo ngày, tuần hoặc tháng
+  // Lọc theo ngày, tuần hoặc tháng với tối ưu hóa
   Object.keys(companySchedules).forEach(companyName => {
     const companyData = companySchedules[companyName];
     
-    // Kiểm tra xem công ty có lịch khám trong khoảng thời gian được lọc không
-    let hasAppointmentInTimeFilter = false;
-    
-    if (timeFilter === 'today') {
-      // Kiểm tra ngày hiện tại
-      hasAppointmentInTimeFilter = companyData[currentDateKey] && companyData[currentDateKey] > 0;
-      console.log(`Công ty ${companyName} trong ngày ${currentDateKey}: ${hasAppointmentInTimeFilter ? 'Có' : 'Không'}`);
-    } else if (timeFilter === 'week') {
-      // Kiểm tra tuần hiện tại
-      for (const dateKey of currentWeekDates) {
-        if (companyData[dateKey] && companyData[dateKey] > 0) {
-          hasAppointmentInTimeFilter = true;
-          console.log(`Công ty ${companyName} trong tuần có ngày ${dateKey}: Có`);
-          break;
-        }
-      }
-    } else if (timeFilter === 'month') {
-      // Kiểm tra tháng hiện tại
-      for (const dateKey of currentMonthDates) {
-        if (companyData[dateKey] && companyData[dateKey] > 0) {
-          hasAppointmentInTimeFilter = true;
-          console.log(`Công ty ${companyName} trong tháng có ngày ${dateKey}: Có`);
-          break;
-        }
-      }
-    }
+    // Tối ưu: Kiểm tra intersection giữa company dates và target dates
+    const hasAppointmentInTimeFilter = Object.keys(companyData).some(dateKey => {
+      return targetDatesSet.has(dateKey) && companyData[dateKey] > 0;
+    });
     
     // Nếu có lịch khám trong khoảng thời gian được lọc, thêm vào kết quả
     if (hasAppointmentInTimeFilter) {
@@ -733,7 +775,7 @@ function applyTimeFilter(companySchedules, timeFilter) {
   
   console.log(`Lọc theo ${timeFilter}: Từ ${Object.keys(companySchedules).length} công ty còn ${Object.keys(filteredSchedules).length} công ty`);
   
-  return timeFilter === 'all' ? companySchedules : filteredSchedules;
+  return filteredSchedules;
 }
 
 // Các hàm utility giữ nguyên
@@ -886,8 +928,33 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
     const currentYear = year || new Date().getFullYear();
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     
-    // Tạo object để lưu dữ liệu theo ngày
-    const dailyClinicalData = {};
+    // Tối ưu: Sử dụng Map để lưu dữ liệu theo ngày
+    const dailyClinicalData = new Map();
+    
+    // Tạo template object cho việc khởi tạo nhanh
+    const createEmptyDayData = (dateKey, dateDisplay) => ({
+      date: dateDisplay,
+      dateKey: dateKey,
+      // Khởi tạo tất cả các cột với giá trị 0
+      khamPhuKhoaSang: 0,
+      xQuangSang: 0,
+      dienTamDoSang: 0,
+      sieuAmBungSang: 0,
+      sieuAmVuSang: 0,
+      sieuAmGiapSang: 0,
+      sieuAmTimSang: 0,
+      sieuAmDongMachCanhSang: 0,
+      sieuAmDanHoiMoGanSang: 0,
+      khamPhuKhoaChieu: 0,
+      xQuangChieu: 0,
+      dienTamDoChieu: 0,
+      sieuAmBungChieu: 0,
+      sieuAmVuChieu: 0,
+      sieuAmGiapChieu: 0,
+      sieuAmTimChieu: 0,
+      sieuAmDongMachCanhChieu: 0,
+      sieuAmDanHoiMoGanChieu: 0
+    });
     
     // Khởi tạo dữ liệu cho tất cả các ngày trong tháng (trừ Chủ nhật)
     for (let day = 1; day <= daysInMonth; day++) {
@@ -900,39 +967,17 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
         continue; // Bỏ qua Chủ nhật
       }
       
-      dailyClinicalData[dateKey] = {
-        date: dateDisplay,
-        dateKey: dateKey,
-        // Khởi tạo tất cả các cột với giá trị 0
-        khamPhuKhoaSang: 0,
-        xQuangSang: 0,
-        dienTamDoSang: 0,
-        sieuAmBungSang: 0,
-        sieuAmVuSang: 0,
-        sieuAmGiapSang: 0,
-        sieuAmTimSang: 0,
-        sieuAmDongMachCanhSang: 0,
-        sieuAmDanHoiMoGanSang: 0,
-        khamPhuKhoaChieu: 0,
-        xQuangChieu: 0,
-        dienTamDoChieu: 0,
-        sieuAmBungChieu: 0,
-        sieuAmVuChieu: 0,
-        sieuAmGiapChieu: 0,
-        sieuAmTimChieu: 0,
-        sieuAmDongMachCanhChieu: 0,
-        sieuAmDanHoiMoGanChieu: 0
-      };
+      dailyClinicalData.set(dateKey, createEmptyDayData(dateKey, dateDisplay));
     }
     
-    // Tổng hợp dữ liệu từ các công ty theo khoảng thời gian khám
+    // Tối ưu: Tổng hợp dữ liệu từ các công ty theo khoảng thời gian khám
     // Nếu có searchCompany, chỉ lấy dữ liệu từ công ty đó
+    const searchLower = searchCompany ? searchCompany.toLowerCase().trim() : '';
+    
     Object.keys(companyDetails).forEach(companyName => {
-      // Lọc theo searchCompany nếu có
-      if (searchCompany && searchCompany.trim() !== '') {
-        if (!companyName.toLowerCase().includes(searchCompany.toLowerCase())) {
-          return; // Bỏ qua công ty này nếu không khớp với tìm kiếm
-        }
+      // Tối ưu: Early return cho search filter
+      if (searchLower && !companyName.toLowerCase().includes(searchLower)) {
+        return; // Bỏ qua công ty này nếu không khớp với tìm kiếm
       }
       
       const details = companyDetails[companyName];
@@ -958,23 +1003,22 @@ function getClinicalData(month = null, year = null, showCompleted = false, searc
         }
       }
       
-      // Cộng dồn số liệu của công ty vào các ngày khám thực tế
+      // Tối ưu: Cộng dồn số liệu của công ty vào các ngày khám thực tế
       actualWorkingDaysInMonth.forEach(workingDay => {
         const dateKey = formatDateKey(workingDay);
+        const dayData = dailyClinicalData.get(dateKey);
         
-        if (dailyClinicalData[dateKey]) {
+        if (dayData) {
           // Cộng dồn số liệu của công ty vào ngày khám này
           clinicalColumns.forEach(col => {
-            dailyClinicalData[dateKey][col.key] += details[col.key] || 0;
+            dayData[col.key] += details[col.key] || 0;
           });
         }
       });
     });
     
-    // Chuyển đổi object thành array và tính Max cho mỗi ngày - hiển thị tất cả ngày trong tháng
-    Object.keys(dailyClinicalData).forEach(dateKey => {
-      const dayData = dailyClinicalData[dateKey];
-      
+    // Tối ưu: Chuyển đổi Map thành array và tính Max cho mỗi ngày
+    dailyClinicalData.forEach((dayData, dateKey) => {
       // Tính giá trị Max của tất cả các hạng mục khám trong ngày
       const maxValue = Math.max(
         ...clinicalColumns.map(col => dayData[col.key] || 0)

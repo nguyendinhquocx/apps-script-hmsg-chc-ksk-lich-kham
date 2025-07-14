@@ -21,6 +21,11 @@ let clinicalData = null;
 let totalPeopleChart = null;
 let clinicalMaxChart = null;
 
+// Debounce variables
+let debounceTimer = null;
+let filterDebounceTimer = null;
+const DEBOUNCE_DELAY = 500; // 500ms debounce delay
+
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
   initializeApp();
@@ -37,37 +42,79 @@ function initializeApp() {
     navigateMonth(1);
   });
   
-  // Search input - only search on Enter
+  // Search input - debounced search
   const searchInput = document.getElementById('companySearch');
+  searchInput.addEventListener('input', (e) => {
+    const value = e.target.value.trim();
+    
+    // Clear previous debounce timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    // Set new debounce timer
+    debounceTimer = setTimeout(() => {
+      searchCompany = value;
+      applyFilters();
+    }, DEBOUNCE_DELAY);
+  });
+  
+  // Also handle Enter key for immediate search
   searchInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
       searchCompany = e.target.value.trim();
       applyFilters();
     }
   });
   
-  // Employee filter - immediate response
+  // Employee filter - debounced response
   document.getElementById('employeeFilter').addEventListener('change', (e) => {
     filterEmployee = e.target.value;
-    applyFilters();
+    
+    // Clear previous filter debounce timer
+    if (filterDebounceTimer) {
+      clearTimeout(filterDebounceTimer);
+    }
+    
+    // Set new filter debounce timer
+    filterDebounceTimer = setTimeout(() => {
+      applyFilters();
+    }, DEBOUNCE_DELAY);
   });
   
-  // Shift filter - immediate response với server call
+  // Shift filter - debounced response với server call
   document.getElementById('shiftFilter').addEventListener('change', (e) => {
     shiftFilter = e.target.value;
     console.log('🔧 Đã chọn shift filter: ' + shiftFilter);
     
-    // Gọi lại server với shiftFilter mới
-    loadDataWithCurrentFilters();
+    // Clear previous filter debounce timer
+    if (filterDebounceTimer) {
+      clearTimeout(filterDebounceTimer);
+    }
+    
+    // Set new filter debounce timer
+    filterDebounceTimer = setTimeout(() => {
+      loadDataWithCurrentFilters();
+    }, DEBOUNCE_DELAY);
   });
   
-  // Time filter - immediate response với server call
+  // Time filter - debounced response với server call
   document.getElementById('timeFilter').addEventListener('change', (e) => {
     timeFilter = e.target.value;
     console.log('🔧 Đã chọn time filter: ' + timeFilter);
     
-    // Gọi lại server với timeFilter mới
-    loadDataWithCurrentFilters();
+    // Clear previous filter debounce timer
+    if (filterDebounceTimer) {
+      clearTimeout(filterDebounceTimer);
+    }
+    
+    // Set new filter debounce timer
+    filterDebounceTimer = setTimeout(() => {
+      loadDataWithCurrentFilters();
+    }, DEBOUNCE_DELAY);
   });
   
   // Completed filter checkbox
@@ -122,7 +169,7 @@ function loadCurrentMonth() {
 let failureCount = 0;
 let lastFailureTime = 0;
 const CIRCUIT_BREAKER_THRESHOLD = 3;
-const CIRCUIT_BREAKER_TIMEOUT = 30000; // 30 seconds
+const CIRCUIT_BREAKER_TIMEOUT = 60000; // 60 seconds - tăng timeout để xử lý dữ liệu lớn
 
 function isCircuitBreakerOpen() {
   if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
@@ -157,9 +204,9 @@ function loadData() {
   
   showLoading();
   
-  // Progressive loading with shorter initial timeout
+  // Progressive loading with optimized timeout
   const timeoutId = setTimeout(() => {
-    console.warn('⚠️ API call timeout after 10 seconds');
+    console.warn('⚠️ API call timeout after 15 seconds');
     hideLoading();
     recordFailure();
     showError('Tải dữ liệu quá lâu. Đang thử lại...');
@@ -169,7 +216,7 @@ function loadData() {
     setTimeout(() => {
       retryLoadData();
     }, retryDelay);
-  }, 10000);
+  }, 15000); // 15 second timeout - tăng để xử lý dữ liệu lớn
   
   google.script.run
     .withSuccessHandler((data) => {
@@ -222,7 +269,7 @@ function retryLoadData() {
         retryLoadData();
       }, 5000);
     }
-  }, 8000);
+  }, 12000); // 12 second timeout - tăng cho retry
   
   google.script.run
     .withSuccessHandler((data) => {
@@ -244,7 +291,7 @@ function loadDataWithCurrentFilters() {
   
   // Thêm timeout cho filter loading
   const filterTimeoutId = setTimeout(() => {
-    console.warn('⚠️ Filter loading timeout after 12 seconds');
+    console.warn('⚠️ Filter loading timeout after 18 seconds');
     hideLoading();
     showError('Tải dữ liệu lọc quá lâu. Vui lòng thử lại.');
   }, 12000);
@@ -654,9 +701,14 @@ function renderTimeline(timeline) {
           
           // Nếu không có dữ liệu khám nhưng là ngày lấy máu, chỉ hiển thị màu nền
           if (value === 0) {
-            inner.textContent = ''; // Loại bỏ dấu chấm đen
-            inner.style.fontSize = '14px';
-            inner.style.fontWeight = 'bold';
+            // Kiểm tra nếu ngày lấy máu khác ngày bắt đầu thì hiển thị icon 🩸
+            if (normalizedBloodDate !== normalizedStartDate) {
+              inner.textContent = '.'; // Thêm icon máu
+            } else {
+              inner.textContent = ''; // Ngày bắt đầu không có icon
+            }
+            inner.style.fontSize = '10px';
+            inner.style.fontWeight = 'normal';
             td.classList.add('blood-date-only');
             td.title = `${row.company}\nNgày lấy máu: ${formatDate(row.ngayLayMau)}`;
           }
