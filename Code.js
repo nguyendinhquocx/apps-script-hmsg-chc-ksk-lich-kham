@@ -388,6 +388,7 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
         cacNgayKhamThucTe: record.cacNgayKhamThucTe || '', // Thêm trường cacNgayKhamThucTe
         ngayLayMau: record.ngayLayMau || '', // Thêm trường ngayLayMau
         trangThai: trangThaiKham, // Thêm trường trạng thái
+        gold: record.gold || '', // Thêm trường gold
         // Cận lâm sàng - Sáng
         sieuAmBungSang: 0,
         khamPhuKhoaSang: 0,
@@ -448,6 +449,11 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
     // Cập nhật ngayLayMau nếu có dữ liệu mới
     if (record.ngayLayMau && typeof record.ngayLayMau === 'string' && record.ngayLayMau.trim() !== '') {
       companyDetail.ngayLayMau = record.ngayLayMau;
+    }
+    
+    // Cập nhật thông tin gold nếu có dữ liệu mới
+    if (record.gold && record.gold.trim() !== '') {
+      companyDetail.gold = record.gold;
     }
     
     if (!companySchedules.has(companyName)) {

@@ -21,10 +21,36 @@ let clinicalData = null;
 let totalPeopleChart = null;
 let clinicalMaxChart = null;
 
-// Debounce variables
+// Debounce variables với tối ưu hóa
 let debounceTimer = null;
 let filterDebounceTimer = null;
-const DEBOUNCE_DELAY = 500; // 500ms debounce delay
+const DEBOUNCE_DELAY = 300; // Giảm từ 500ms xuống 300ms để phản hồi nhanh hơn
+
+// Cache và performance optimization
+let dataCache = {};
+let lastLoadTime = 0;
+const CACHE_DURATION = 30000; // 30 giây cache
+let isLoading = false;
+let pendingRequests = 0;
+
+// Auto clear cache để tránh memory leak
+setInterval(() => {
+  const now = Date.now();
+  const cacheKeys = Object.keys(dataCache);
+  
+  // Clear cache entries older than CACHE_DURATION
+  cacheKeys.forEach(key => {
+    if (now - lastLoadTime > CACHE_DURATION) {
+      delete dataCache[key];
+    }
+  });
+  
+  // Log cache status
+  if (cacheKeys.length > 5) {
+    console.log('🧹 Cache cleanup: removed old entries');
+    dataCache = {}; // Clear all if too many entries
+  }
+}, 60000); // Check every minute
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -129,6 +155,10 @@ function initializeApp() {
 }
 
 function navigateMonth(direction) {
+  // Clear cache khi chuyển tháng để tránh hiển thị dữ liệu cũ
+  dataCache = {};
+  lastLoadTime = 0;
+  
   currentMonth += direction;
   
   if (currentMonth > 12) {
@@ -192,48 +222,78 @@ function recordSuccess() {
 function loadData() {
   console.log('loadData called');
   
+  // Prevent multiple simultaneous loads
+  if (isLoading) {
+    console.log('⏳ Already loading, skipping duplicate request');
+    return;
+  }
+  
+  // Check cache first để tăng tốc độ
+  const cacheKey = `${currentMonth}_${currentYear}_${searchCompany}_${filterEmployee}_${shiftFilter}_${timeFilter}_${showGold}`;
+  const now = Date.now();
+  
+  if (dataCache[cacheKey] && (now - lastLoadTime) < CACHE_DURATION) {
+    console.log('📦 Using cached data');
+    // Hiển thị thông báo ngắn về việc sử dụng cache
+    showQuickMessage('Đang sử dụng dữ liệu đã lưu...');
+    setTimeout(() => {
+      onDataLoaded(dataCache[cacheKey]);
+    }, 100);
+    return;
+  }
+  
   // Check circuit breaker
   if (isCircuitBreakerOpen()) {
     showError('Hệ thống tạm thời không khả dụng. Vui lòng thử lại sau 30 giây.');
     return;
   }
   
+  isLoading = true;
+  pendingRequests++;
   showLoading();
   
-  // Progressive loading with optimized timeout
+  // Giảm timeout để phản hồi nhanh hơn
   const timeoutId = setTimeout(() => {
-    console.warn('⚠️ API call timeout after 15 seconds');
+    console.warn('⚠️ API call timeout after 10 seconds');
     hideLoading();
+    isLoading = false;
     recordFailure();
     showError('Tải dữ liệu quá lâu. Đang thử lại...');
     
-    // Auto retry with exponential backoff
-    const retryDelay = Math.min(2000 * Math.pow(2, failureCount - 1), 10000);
+    // Auto retry với delay ngắn hơn
+    const retryDelay = Math.min(1500 * Math.pow(2, failureCount - 1), 6000);
     setTimeout(() => {
       retryLoadData();
     }, retryDelay);
-  }, 15000); // 15 second timeout - tăng để xử lý dữ liệu lớn
+  }, 10000); // Giảm từ 15s xuống 10s
   
   google.script.run
     .withSuccessHandler((data) => {
       clearTimeout(timeoutId);
+      isLoading = false;
       recordSuccess();
+      
+      // Cache dữ liệu để sử dụng lần sau
+      dataCache[cacheKey] = data;
+      lastLoadTime = now;
+      
       onDataLoaded(data);
     })
     .withFailureHandler((error) => {
       clearTimeout(timeoutId);
+      isLoading = false;
       recordFailure();
       console.error('❌ First attempt failed:', error);
       
-      // Immediate retry for network errors
+      // Retry nhanh hơn cho network errors
       if (error.message && error.message.includes('network')) {
         setTimeout(() => {
           console.log('🔄 Network retry...');
           retryLoadData();
-        }, 1000);
+        }, 500);
       } else {
-        // Exponential backoff for other errors
-        const retryDelay = Math.min(2000 * Math.pow(2, failureCount - 1), 8000);
+        // Exponential backoff với delay ngắn hơn
+        const retryDelay = Math.min(1500 * Math.pow(2, failureCount - 1), 5000);
         setTimeout(() => {
           console.log('🔄 Retrying data load...');
           retryLoadData();
@@ -242,11 +302,11 @@ function loadData() {
     })
     .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
-  // Load clinical data with staggered timing
+  // Load clinical data với delay ngắn hơn
   setTimeout(() => {
     console.log('Calling loadClinicalData...');
     loadClinicalData();
-  }, 500);
+  }, 200);
 }
 
 function retryLoadData() {
@@ -281,35 +341,74 @@ function retryLoadData() {
     .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
 }
 
-// Load data với current filters
+// Tối ưu hóa loadDataWithCurrentFilters với smart caching
 function loadDataWithCurrentFilters() {
+  // Prevent multiple simultaneous requests
+  if (isLoading) {
+    console.log('⏳ Filter request already in progress');
+    return;
+  }
+  
+  // Kiểm tra cache trước khi gọi server
+  const cacheKey = `${currentMonth}_${currentYear}_${searchCompany}_${filterEmployee}_${shiftFilter}_${timeFilter}_${showGold}`;
+  const now = Date.now();
+  
+  if (dataCache[cacheKey] && (now - lastLoadTime) < CACHE_DURATION) {
+    console.log('📦 Sử dụng dữ liệu từ cache cho filter');
+    showQuickMessage('Áp dụng bộ lọc từ dữ liệu đã lưu...');
+    setTimeout(() => {
+      onDataLoaded(dataCache[cacheKey]);
+    }, 50);
+    return;
+  }
+  
+  isLoading = true;
   showLoading();
   
-  // Thêm timeout cho filter loading
+  // Giảm timeout xuống để phản hồi nhanh hơn
   const filterTimeoutId = setTimeout(() => {
-    console.warn('⚠️ Filter loading timeout after 18 seconds');
+    console.warn('⚠️ Filter loading timeout after 8 seconds');
     hideLoading();
-    showError('Tải dữ liệu lọc quá lâu. Vui lòng thử lại.');
-  }, 12000);
+    isLoading = false;
+    showError('Tải dữ liệu lọc quá lâu. Đang thử lại...');
+    
+    // Auto retry với delay ngắn
+    setTimeout(() => {
+      loadDataWithCurrentFilters();
+    }, 1500);
+  }, 8000); // Giảm từ 12s xuống 8s
   
   google.script.run
     .withSuccessHandler((data) => {
       clearTimeout(filterTimeoutId);
+      isLoading = false;
+      
+      // Cache dữ liệu để sử dụng lần sau
+      dataCache[cacheKey] = data;
+      lastLoadTime = now;
+      
       onDataLoaded(data);
     })
     .withFailureHandler((error) => {
       clearTimeout(filterTimeoutId);
+      isLoading = false;
       onDataError(error);
     })
     .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
-  // Load clinical data separately with delay
+  // Load clinical data với delay ngắn hơn
   setTimeout(() => {
     loadClinicalData();
-  }, 800);
+  }, 300);
 }
 
 function refreshData() {
+  // Clear cache để force reload
+  dataCache = {};
+  lastLoadTime = 0;
+  isLoading = false;
+  pendingRequests = 0;
+  
   showLoading();
   
   // Reset all filters
@@ -332,6 +431,7 @@ function refreshData() {
 
 function onDataLoaded(data) {
   console.log('✅ Data loaded successfully');
+  pendingRequests = Math.max(0, pendingRequests - 1);
   
   if (!data.success) {
     hideLoading();
@@ -346,24 +446,26 @@ function onDataLoaded(data) {
   originalData = JSON.parse(JSON.stringify(data)); // Deep clone
   dashboardData = data;
   
-  // Progressive rendering for better UX
+  // Tối ưu hóa progressive rendering với requestAnimationFrame
   try {
-    // Step 1: Show basic dashboard structure immediately
-    showDashboard();
+    // Step 1: Ẩn loading ngay lập tức để cải thiện UX
     hideLoading();
     
-    // Step 2: Update filters (fast operation)
+    // Step 2: Show dashboard structure
+    showDashboard();
+    
+    // Step 3: Update filters (fast operation)
     updateEmployeeFilter(data.employees || []);
     
-    // Step 3: Render main content with micro-delays for smooth UX
-    setTimeout(() => {
+    // Step 4: Render content với requestAnimationFrame để smooth hơn
+    requestAnimationFrame(() => {
       renderDashboard(dashboardData);
-    }, 50);
-    
-    // Step 4: Update charts after main content is rendered
-    setTimeout(() => {
-      updateCharts();
-    }, 200);
+      
+      // Step 5: Update charts sau khi render xong
+      requestAnimationFrame(() => {
+        updateCharts();
+      });
+    });
     
   } catch (error) {
     console.error('❌ Error rendering dashboard:', error);
@@ -1220,6 +1322,23 @@ function showError(message) {
   document.getElementById('dashboard').style.display = 'none';
 }
 
+// Hàm hiển thị thông báo nhanh cho cache
+function showQuickMessage(message) {
+  const loadingDiv = document.getElementById('loading');
+  const loadingText = loadingDiv.querySelector('div');
+  if (loadingText) {
+    const originalText = loadingText.textContent;
+    loadingText.textContent = message;
+    loadingDiv.style.display = 'flex';
+    
+    // Hide after short delay
+    setTimeout(() => {
+      loadingDiv.style.display = 'none';
+      loadingText.textContent = originalText;
+    }, 800);
+  }
+}
+
 function showDashboard() {
   document.getElementById('error').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
@@ -1789,23 +1908,68 @@ function showClinicalColumnDetail(columnKey, columnLabel) {
   document.getElementById('detailModal').classList.add('show');
 }
 
-// Cập nhật hàm applyFilters để gọi getClinicalData với đúng tham số
+// Tối ưu hóa applyFilters - chỉ filter client-side cho Gold checkbox
 function applyFilters() {
   if (!originalData) return;
   
-  // Gọi API server để lấy dữ liệu mới với tất cả filters
+  // Prevent multiple simultaneous filter requests
+  if (isLoading) {
+    console.log('⏳ Filter request already in progress');
+    return;
+  }
+  
+  // Chỉ filter client-side cho Gold checkbox để tránh server call không cần thiết
+  if (showGold !== undefined && searchCompany === '' && filterEmployee === '') {
+    console.log('🔧 Applying Gold filter client-side');
+    
+    // Filter dữ liệu từ cache originalData thay vì gọi server
+    const filteredData = JSON.parse(JSON.stringify(originalData)); // Deep clone
+    
+    // Apply Gold filter client-side - phải phù hợp với server-side logic
+    if (filteredData.timeline && filteredData.timeline.rows) {
+      filteredData.timeline.rows = filteredData.timeline.rows.filter(row => {
+        if (!showGold) return true; // Hiển thị tất cả nếu không check Gold
+        
+        // Kiểm tra cột 'gold' có đánh dấu 'x' hay không (phù hợp với server-side)
+        const companyDetail = filteredData.companyDetails && filteredData.companyDetails[row.company];
+        const goldValue = companyDetail && companyDetail.gold ? companyDetail.gold.toString().toLowerCase().trim() : '';
+        const hasGoldMark = goldValue === 'x';
+        
+        // Chỉ hiển thị công ty có đánh dấu 'x' trong cột gold khi check Gold
+        return hasGoldMark;
+      });
+    }
+    
+    // Render ngay lập tức từ dữ liệu đã filter
+    dashboardData = filteredData;
+    renderDashboard(dashboardData);
+    updateCharts();
+    return;
+  }
+  
+  // Chỉ gọi server khi thực sự cần thiết (search, employee filter, shift, time)
+  console.log('🔧 Applying filters with server call');
+  isLoading = true;
   showLoading();
   
   google.script.run
-    .withSuccessHandler(onFilterDataLoaded)
-    .withFailureHandler(onDataError)
+    .withSuccessHandler((data) => {
+      isLoading = false;
+      onFilterDataLoaded(data);
+    })
+    .withFailureHandler((error) => {
+      isLoading = false;
+      onDataError(error);
+    })
     .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
-  // Cũng gọi getClinicalData với cùng các tham số filter
-  google.script.run
-    .withSuccessHandler(onClinicalDataLoaded)
-    .withFailureHandler(onDataError)
-    .getClinicalData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+  // Gọi getClinicalData với delay để tránh overload
+  setTimeout(() => {
+    google.script.run
+      .withSuccessHandler(onClinicalDataLoaded)
+      .withFailureHandler(onDataError)
+      .getClinicalData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+  }, 200);
 }
 
 // Chart Functions
