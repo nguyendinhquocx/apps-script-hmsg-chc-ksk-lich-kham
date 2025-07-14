@@ -473,20 +473,28 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     
     // Phân bổ số người khám cho các ngày
     if (isCompleted) {
-      // Công ty đã khám xong: hiển thị số người trung bình cho những ngày thực tế đã khám
-      // Tính số người trung bình mỗi ngày dựa trên tổng số người và số ngày khám thực tế
-      const peoplePerDay = actualWorkingDaysInMonth.length > 0 ? Math.ceil(totalPeopleForPeriod / actualWorkingDaysInMonth.length) : 0;
-      
+      // Công ty đã khám xong: hiển thị số người thực tế cho từng ngày khám cụ thể
+      // Đối với công ty đã khám xong, chúng ta sử dụng số liệu từ ca sáng/chiều cho từng ngày
       actualWorkingDaysInMonth.forEach(workDate => {
         const dateKey = formatDateKey(workDate);
         
         // Chỉ hiển thị cho những ngày trong khoảng thời gian khám thực tế
         if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
+          let peopleForThisDay = 0;
+          
+          if (shiftFilter === 'morning' || shiftFilter === 'sang') {
+            peopleForThisDay = sang; // Số người sáng cho ngày này
+          } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
+            peopleForThisDay = chieu; // Số người chiều cho ngày này
+          } else {
+            peopleForThisDay = sang + chieu; // Tổng số người cho ngày này
+          }
+          
           const companyData = companySchedules.get(companyName) || {};
-          companyData[dateKey] = (companyData[dateKey] || 0) + peoplePerDay;
+          companyData[dateKey] = (companyData[dateKey] || 0) + peopleForThisDay;
           companySchedules.set(companyName, companyData);
           
-          dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peoplePerDay;
+          dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peopleForThisDay;
         }
       });
     } else {
@@ -508,8 +516,26 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     }
     
     // Cập nhật tổng công ty với tổng số người trong cả giai đoạn
+    let actualTotalForPeriod = totalPeopleForPeriod;
+    
+    if (isCompleted) {
+      // Đối với công ty đã khám xong, tính tổng dựa trên số người thực tế cho từng ngày khám
+      actualTotalForPeriod = 0;
+      actualWorkingDaysInMonth.forEach(workDate => {
+        if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
+          if (shiftFilter === 'morning' || shiftFilter === 'sang') {
+            actualTotalForPeriod += sang;
+          } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
+            actualTotalForPeriod += chieu;
+          } else {
+            actualTotalForPeriod += sang + chieu;
+          }
+        }
+      });
+    }
+    
     const currentTotal = companyTotals.get(companyName) || 0;
-    companyTotals.set(companyName, currentTotal + totalPeopleForPeriod);
+    companyTotals.set(companyName, currentTotal + actualTotalForPeriod);
   });
   
   // Convert Maps back to Objects for compatibility
@@ -530,45 +556,8 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     }
   });
   
-  // Nếu không hiển thị completed, loại bỏ khỏi timeline
-  if (!showCompleted) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time để so sánh chỉ ngày
-    
-    const companiesToRemove = [];
-    companyStatus.forEach((status, companyName) => {
-      const statusLower = status.toLowerCase().trim();
-      const companyDetail = companyDetails.get(companyName);
-      
-      // Kiểm tra trạng thái "Đã khám xong" HOẶC ngày kết thúc < hôm nay
-      let shouldRemove = false;
-      
-      if (statusLower === 'đã khám xong' || statusLower === 'da kham xong') {
-        shouldRemove = true;
-      } else if (companyDetail && companyDetail.ngayKetThuc) {
-        const endDate = parseDate(companyDetail.ngayKetThuc);
-        if (endDate && endDate < today) {
-          shouldRemove = true;
-        }
-      }
-      
-      if (shouldRemove) {
-        companiesToRemove.push(companyName);
-      }
-    });
-    
-    // Remove companies from Maps
-    companiesToRemove.forEach(companyName => {
-      companySchedules.delete(companyName);
-      companyTotals.delete(companyName);
-      companyDetails.delete(companyName);
-    });
-    
-    // Update converted objects
-    companySchedulesObj = Object.fromEntries(companySchedules);
-    companyTotalsObj = Object.fromEntries(companyTotals);
-    companyDetailsObj = Object.fromEntries(companyDetails);
-  }
+  // Không loại bỏ công ty đã khám xong khỏi timeline
+  // Tất cả công ty sẽ được hiển thị để đảm bảo tính toán tổng và biểu đồ chính xác
 
   // Áp dụng time filter (ngày, tuần, tháng)
   const filteredCompanySchedules = applyTimeFilter(companySchedulesObj, timeFilter);

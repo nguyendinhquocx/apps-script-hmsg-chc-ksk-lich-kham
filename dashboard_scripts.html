@@ -7,7 +7,7 @@ function isSunday(date) {
 // Global state x.
 let currentMonth = new Date().getMonth() + 1;
 let currentYear = new Date().getFullYear();
-let showCompleted = false;
+let showCompleted = true; // Đặt mặc định là true
 let showGold = false;
 let searchCompany = '';
 let filterEmployee = '';
@@ -319,13 +319,13 @@ function refreshData() {
   // Reset all filters
   searchCompany = '';
   filterEmployee = '';
-  showCompleted = false;
+  showCompleted = true; // Đặt mặc định là true
   showGold = false;
   shiftFilter = 'total';
   timeFilter = 'all';
   document.getElementById('companySearch').value = '';
   document.getElementById('employeeFilter').value = '';
-  document.getElementById('showCompleted').checked = false;
+  document.getElementById('showCompleted').checked = true; // Đặt mặc định là checked
   document.getElementById('showGold').checked = false;
   document.getElementById('shiftFilter').value = 'total';
   document.getElementById('timeFilter').value = 'all';
@@ -564,8 +564,26 @@ function renderTimeline(timeline) {
     dateRow.appendChild(dateTh);
   });
   
-  // Sắp xếp các hàng theo số người giảm dần
-  timeline.rows.sort((a, b) => b.total - a.total);
+  // Sắp xếp các hàng: công ty chưa khám xong trước (theo số người giảm dần), công ty đã khám xong sau (theo số người giảm dần)
+  timeline.rows.sort((a, b) => {
+    // Lấy thông tin trạng thái công ty từ dashboardData
+    const companyDetailA = dashboardData && dashboardData.companyDetails && dashboardData.companyDetails[a.company];
+    const companyDetailB = dashboardData && dashboardData.companyDetails && dashboardData.companyDetails[b.company];
+    
+    const isCompletedA = companyDetailA && companyDetailA.trangThai === 'đã khám xong';
+    const isCompletedB = companyDetailB && companyDetailB.trangThai === 'đã khám xong';
+    
+    // Nếu một công ty đã khám xong và một công ty chưa khám xong
+    if (isCompletedA && !isCompletedB) {
+      return 1; // A (đã khám xong) xuống dưới
+    }
+    if (!isCompletedA && isCompletedB) {
+      return -1; // B (đã khám xong) xuống dưới
+    }
+    
+    // Nếu cả hai cùng trạng thái, sắp xếp theo số người giảm dần
+    return b.total - a.total;
+  });
   
   // Calculate daily totals for the currently displayed companies
   const dailyTotalsFiltered = new Array(timeline.dates.length).fill(0);
@@ -643,6 +661,14 @@ function renderTimeline(timeline) {
     const displayName = shortenCompanyName(row.company);
     companyCell.textContent = displayName;
     companyCell.title = row.company; // Full name on hover
+    
+    // Kiểm tra nếu công ty đã khám xong thì đổi màu chữ thành xanh lá cây
+    const companyDetail = dashboardData && dashboardData.companyDetails && dashboardData.companyDetails[row.company];
+    const isCompleted = companyDetail && companyDetail.trangThai === 'đã khám xong';
+    if (isCompleted) {
+      companyCell.style.color = '#28a745'; // Màu xanh lá cây
+      companyCell.style.fontWeight = 'bold';
+    }
     
     // Add click event for company details
     companyCell.addEventListener('click', () => {
