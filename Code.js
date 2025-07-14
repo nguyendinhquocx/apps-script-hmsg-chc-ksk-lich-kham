@@ -324,13 +324,43 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
     const startDate = parseDate(record.ngayBatDau);
     const endDate = parseDate(record.ngayKetThuc);
     const soNguoiKham = parseInt(record.soNguoiKham) || 0;
-    const tongSoNgayKham = parseInt(record.tongSoNgayKham) || 1;
+    let tongSoNgayKham = parseInt(record.tongSoNgayKham) || 1;
     const companyName = record.tenCongTy.trim();
     const trangThaiKham = record.trangThaiKham || 'Chưa khám xong';
-    const sang = parseInt(record.sang) || 0;
-    const chieu = parseInt(record.chieu) || 0;
+    let sang = parseInt(record.sang) || 0;
+    let chieu = parseInt(record.chieu) || 0;
     
     if (!startDate || !endDate || soNguoiKham === 0) return;
+    
+    // 🔧 FIX: Xử lý đặc biệt cho công ty 'Đã khám xong' có dữ liệu trống
+    const isCompletedCompany = (trangThaiKham || '').toLowerCase().trim() === 'đã khám xong' || 
+                              (trangThaiKham || '').toLowerCase().trim() === 'da kham xong';
+    
+    if (isCompletedCompany) {
+      // Tính số ngày làm việc thực tế từ ngày bắt đầu đến ngày kết thúc (loại trừ chủ nhật)
+      const workingDays = adjustForWorkingDays(startDate, endDate, 999); // 999 để lấy tất cả ngày
+      const workingDaysInTargetMonth = workingDays.filter(day => 
+        day.getMonth() + 1 === targetMonth && day.getFullYear() === targetYear
+      );
+      
+      if (workingDaysInTargetMonth.length > 0) {
+        // Nếu tongSoNgayKham = 0 hoặc trống, tính lại dựa trên ngày làm việc
+        if (tongSoNgayKham === 0) {
+          tongSoNgayKham = workingDaysInTargetMonth.length;
+        }
+        
+        // Nếu sang và chieu = 0 hoặc trống, tính lại dựa trên tổng số người
+        if (sang === 0 && chieu === 0 && soNguoiKham > 0) {
+          // Phân bổ đều số người khám cho ca sáng và chiều
+          // Giả sử 60% sáng, 40% chiều nếu không có dữ liệu cụ thể
+          const totalDaysForCalculation = tongSoNgayKham > 0 ? tongSoNgayKham : workingDaysInTargetMonth.length;
+          sang = Math.ceil(soNguoiKham * 0.6 / totalDaysForCalculation);
+          chieu = Math.ceil(soNguoiKham * 0.4 / totalDaysForCalculation);
+        }
+        
+        console.log(`🔧 Tính toán cho công ty đã khám xong '${companyName}': ${tongSoNgayKham} ngày, ${sang} sáng/ngày, ${chieu} chiều/ngày, tổng ${soNguoiKham} người`);
+      }
+    }
     
     // Thu thập nhân viên và map với công ty - tối ưu với Map
     if (record.tenNhanVien) {
@@ -386,7 +416,8 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
     companyDetail.sang += sang;
     companyDetail.chieu += chieu;
     companyDetail.tongNguoi += soNguoiKham;
-    companyDetail.tongSoNgay += tongSoNgayKham;
+    // Tạm thời sử dụng tongSoNgayKham, sẽ cập nhật lại sau khi tính actualWorkingDaysInMonth
+    companyDetail.tongSoNgay = Math.max(companyDetail.tongSoNgay, tongSoNgayKham);
     companyDetail.trangThai = trangThaiKham; // Cập nhật trạng thái mới nhất
     
     // Cập nhật dữ liệu cận lâm sàng
@@ -450,6 +481,12 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
     
     if (actualWorkingDaysInMonth.length === 0) return;
     
+    // Cập nhật tongSoNgay với số ngày khám thực tế trong target month
+    const actualDaysInTargetMonth = actualWorkingDaysInMonth.filter(workDate => 
+      workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear
+    );
+    companyDetail.tongSoNgay = Math.max(companyDetail.tongSoNgay, actualDaysInTargetMonth.length);
+    
     // 🔧 FIX: Logic ĐÚNG - hiển thị tổng số người khám trong cả giai đoạn, không phải mỗi ngày
     let totalPeopleForPeriod = 0;
     
@@ -475,21 +512,27 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
     
     // Phân bổ số người khám cho các ngày
     if (isCompleted) {
-      // Công ty đã khám xong: hiển thị số người thực tế cho từng ngày khám cụ thể
-      // Đối với công ty đã khám xong, chúng ta sử dụng số liệu từ ca sáng/chiều cho từng ngày
-      actualWorkingDaysInMonth.forEach(workDate => {
-        const dateKey = formatDateKey(workDate);
+      // Công ty đã khám xong: phân bổ số người thực tế cho từng ngày khám cụ thể
+      // sang và chieu là tổng số người cho cả giai đoạn, cần chia cho số ngày khám thực tế
+      const actualDaysInTargetMonth = actualWorkingDaysInMonth.filter(workDate => 
+        workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear
+      );
+      
+      if (actualDaysInTargetMonth.length > 0) {
+        // Tính số người cho mỗi ngày dựa trên tổng số người và số ngày khám thực tế
+        let peoplePerDayMorning = actualDaysInTargetMonth.length > 0 ? Math.ceil(sang / actualDaysInTargetMonth.length) : 0;
+        let peoplePerDayAfternoon = actualDaysInTargetMonth.length > 0 ? Math.ceil(chieu / actualDaysInTargetMonth.length) : 0;
         
-        // Chỉ hiển thị cho những ngày trong khoảng thời gian khám thực tế
-        if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
+        actualDaysInTargetMonth.forEach(workDate => {
+          const dateKey = formatDateKey(workDate);
           let peopleForThisDay = 0;
           
           if (shiftFilter === 'morning' || shiftFilter === 'sang') {
-            peopleForThisDay = sang; // Số người sáng cho ngày này
+            peopleForThisDay = peoplePerDayMorning; // Số người sáng cho ngày này
           } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
-            peopleForThisDay = chieu; // Số người chiều cho ngày này
+            peopleForThisDay = peoplePerDayAfternoon; // Số người chiều cho ngày này
           } else {
-            peopleForThisDay = sang + chieu; // Tổng số người cho ngày này
+            peopleForThisDay = peoplePerDayMorning + peoplePerDayAfternoon; // Tổng số người cho ngày này
           }
           
           const companyData = companySchedules.get(companyName) || {};
@@ -497,8 +540,8 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
           companySchedules.set(companyName, companyData);
           
           dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peopleForThisDay;
-        }
-      });
+        });
+      }
     } else {
       // Công ty chưa khám xong: phân bổ đều cho tất cả các ngày trong target month
       const peoplePerDay = actualWorkingDaysInMonth.length > 0 ? Math.ceil(totalPeopleForPeriod / actualWorkingDaysInMonth.length) : 0;
@@ -521,19 +564,18 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
     let actualTotalForPeriod = totalPeopleForPeriod;
     
     if (isCompleted) {
-      // Đối với công ty đã khám xong, tính tổng dựa trên số người thực tế cho từng ngày khám
-      actualTotalForPeriod = 0;
-      actualWorkingDaysInMonth.forEach(workDate => {
-        if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
-          if (shiftFilter === 'morning' || shiftFilter === 'sang') {
-            actualTotalForPeriod += sang;
-          } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
-            actualTotalForPeriod += chieu;
-          } else {
-            actualTotalForPeriod += sang + chieu;
-          }
-        }
-      });
+      // Đối với công ty đã khám xong, tính tổng dựa trên số người thực tế trong target month
+      const actualDaysInTargetMonth = actualWorkingDaysInMonth.filter(workDate => 
+        workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear
+      );
+      
+      if (shiftFilter === 'morning' || shiftFilter === 'sang') {
+        actualTotalForPeriod = sang; // Tổng số người sáng trong target month
+      } else if (shiftFilter === 'afternoon' || shiftFilter === 'chieu') {
+        actualTotalForPeriod = chieu; // Tổng số người chiều trong target month
+      } else {
+        actualTotalForPeriod = sang + chieu; // Tổng số người trong target month
+      }
     }
     
     const currentTotal = companyTotals.get(companyName) || 0;
@@ -965,6 +1007,7 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
     const createEmptyDayData = (dateKey, dateDisplay) => ({
       date: dateDisplay,
       dateKey: dateKey,
+      hasCompanies: false, // Theo dõi xem có công ty nào khám trong ngày này không
       // Khởi tạo tất cả các cột với giá trị 0
       khamPhuKhoaSang: 0,
       xQuangSang: 0,
@@ -1039,6 +1082,8 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
         const dayData = dailyClinicalData.get(dateKey);
         
         if (dayData) {
+          // Đánh dấu có công ty khám trong ngày này
+          dayData.hasCompanies = true;
           // Cộng dồn số liệu của công ty vào ngày khám này
           clinicalColumns.forEach(col => {
             dayData[col.key] += details[col.key] || 0;
@@ -1054,10 +1099,14 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
         ...clinicalColumns.map(col => dayData[col.key] || 0)
       );
       
+      // FIX: Sử dụng hasCompanies để quyết định có hiển thị nút hay không
+      // Nếu có công ty khám trong ngày này, max sẽ là maxValue hoặc ít nhất là 1
+      const effectiveMax = dayData.hasCompanies ? Math.max(maxValue, 1) : maxValue;
+      
       const clinicalRow = {
         date: dayData.date,
         dateKey: dateKey,
-        max: maxValue, // Thay thế cột 'employee' bằng 'max'
+        max: effectiveMax, // Sử dụng effectiveMax thay vì maxValue
         // Các cột cận lâm sàng
         khamPhuKhoaSang: dayData.khamPhuKhoaSang,
         xQuangSang: dayData.xQuangSang,
