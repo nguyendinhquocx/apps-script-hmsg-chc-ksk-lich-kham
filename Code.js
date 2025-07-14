@@ -153,6 +153,7 @@ function getColumnIndexes(headers) {
     'trangThaiKham': ['trang thai kham', 'trạng thái khám'],
     'tenNhanVien': ['ten nhan vien', 'tên nhân viên'],
     'gold': ['gold'],
+    'ngayLayMau': ['ngay lay mau', 'ngày lấy máu'],
     // Cận lâm sàng - Sáng
     'sieuAmBungSang': ['sieu am bung sang'],
     'khamPhuKhoaSang': ['kham phu khoa sang'],
@@ -317,6 +318,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
         ngayKetThuc: formatDate(record.ngayKetThuc),
         ngayKham: formatDate(record.ngayBatDau), // Thêm trường ngayKham
         cacNgayKhamThucTe: record.cacNgayKhamThucTe || '', // Thêm trường cacNgayKhamThucTe
+        ngayLayMau: record.ngayLayMau || '', // Thêm trường ngayLayMau
         // Cận lâm sàng - Sáng
         sieuAmBungSang: 0,
         khamPhuKhoaSang: 0,
@@ -366,6 +368,11 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     // Cập nhật cacNgayKhamThucTe nếu có dữ liệu mới
     if (record.cacNgayKhamThucTe && record.cacNgayKhamThucTe.trim() !== '') {
       companyDetails[companyName].cacNgayKhamThucTe = record.cacNgayKhamThucTe;
+    }
+    
+    // Cập nhật ngayLayMau nếu có dữ liệu mới
+    if (record.ngayLayMau && typeof record.ngayLayMau === 'string' && record.ngayLayMau.trim() !== '') {
+      companyDetails[companyName].ngayLayMau = record.ngayLayMau;
     }
     
     if (!companySchedules[companyName]) {
@@ -481,7 +488,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
   // Áp dụng time filter (ngày, tuần, tháng)
   const filteredCompanySchedules = applyTimeFilter(companySchedules, timeFilter);
 
-  const timeline = createTimelineData(filteredCompanySchedules, dailyTotals, companyTotals, targetMonth, targetYear, companyEmployees);
+  const timeline = createTimelineData(filteredCompanySchedules, dailyTotals, companyTotals, targetMonth, targetYear, companyEmployees, companyDetails);
 
   // Tính lại statistics dựa trên filtered data
   const filteredStats = calculateFilteredStats(timeline, shiftFilter);
@@ -548,7 +555,7 @@ function calculateFilteredStats(timeline, shiftFilter) {
 /**
  * Tạo timeline data với sắp xếp theo tổng số ngày khám (nhiều nhất ở dưới)
  */
-function createTimelineData(companySchedules, dailyTotals, companyTotals, month, year, companyEmployees) {
+function createTimelineData(companySchedules, dailyTotals, companyTotals, month, year, companyEmployees, companyDetails = {}) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const timeline = [];
   
@@ -570,11 +577,15 @@ function createTimelineData(companySchedules, dailyTotals, companyTotals, month,
   });
   
   sortedCompanies.forEach(companyName => {
+    const companyDetail = companyDetails[companyName] || {};
     const row = {
       company: companyName,
       employee: companyEmployees[companyName] || '',
       data: [],
-      total: companyTotals[companyName] || 0
+      total: companyTotals[companyName] || 0,
+      ngayLayMau: companyDetail.ngayLayMau || '',
+      ngayBatDau: companyDetail.ngayBatDau || '',
+      ngayKetThuc: companyDetail.ngayKetThuc || ''
     };
     
     for (let day = 1; day <= daysInMonth; day++) {

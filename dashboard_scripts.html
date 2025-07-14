@@ -122,27 +122,81 @@ function loadData() {
   console.log('loadData called');
   showLoading();
   
+  // Thêm timeout và retry logic
+  const timeoutId = setTimeout(() => {
+    console.warn('⚠️ API call timeout after 15 seconds');
+    hideLoading();
+    showError('Tải dữ liệu quá lâu. Vui lòng thử lại.');
+  }, 15000);
+  
   google.script.run
-    .withSuccessHandler(onDataLoaded)
-    .withFailureHandler(onDataError)
+    .withSuccessHandler((data) => {
+      clearTimeout(timeoutId);
+      onDataLoaded(data);
+    })
+    .withFailureHandler((error) => {
+      clearTimeout(timeoutId);
+      console.error('❌ First attempt failed:', error);
+      // Retry once after 2 seconds
+      setTimeout(() => {
+        console.log('🔄 Retrying data load...');
+        retryLoadData();
+      }, 2000);
+    })
     .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
-  // Cũng tải dữ liệu cận lâm sàng
-  console.log('Calling loadClinicalData...');
-  loadClinicalData();
+  // Load clinical data separately to avoid blocking
+  setTimeout(() => {
+    console.log('Calling loadClinicalData...');
+    loadClinicalData();
+  }, 1000);
+}
+
+function retryLoadData() {
+  const retryTimeoutId = setTimeout(() => {
+    console.warn('⚠️ Retry timeout after 10 seconds');
+    hideLoading();
+    showError('Không thể tải dữ liệu. Vui lòng kiểm tra kết nối và thử lại.');
+  }, 10000);
+  
+  google.script.run
+    .withSuccessHandler((data) => {
+      clearTimeout(retryTimeoutId);
+      onDataLoaded(data);
+    })
+    .withFailureHandler((error) => {
+      clearTimeout(retryTimeoutId);
+      onDataError(error);
+    })
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
 }
 
 // Load data với current filters
 function loadDataWithCurrentFilters() {
   showLoading();
   
+  // Thêm timeout cho filter loading
+  const filterTimeoutId = setTimeout(() => {
+    console.warn('⚠️ Filter loading timeout after 12 seconds');
+    hideLoading();
+    showError('Tải dữ liệu lọc quá lâu. Vui lòng thử lại.');
+  }, 12000);
+  
   google.script.run
-    .withSuccessHandler(onDataLoaded)
-    .withFailureHandler(onDataError)
+    .withSuccessHandler((data) => {
+      clearTimeout(filterTimeoutId);
+      onDataLoaded(data);
+    })
+    .withFailureHandler((error) => {
+      clearTimeout(filterTimeoutId);
+      onDataError(error);
+    })
     .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
-  // Cũng tải dữ liệu cận lâm sàng
-  loadClinicalData();
+  // Load clinical data separately with delay
+  setTimeout(() => {
+    loadClinicalData();
+  }, 800);
 }
 
 function refreshData() {
@@ -169,9 +223,10 @@ function refreshData() {
 }
 
 function onDataLoaded(data) {
-  hideLoading();
+  console.log('✅ Data loaded successfully');
   
   if (!data.success) {
+    hideLoading();
     showError(data.error || 'Có lỗi xảy ra khi tải dữ liệu');
     return;
   }
@@ -179,18 +234,28 @@ function onDataLoaded(data) {
   console.log('📊 Data loaded with shiftFilter:', data.summary?.shiftFilter || 'unknown');
   console.log('📊 Data loaded with timeFilter:', data.summary?.timeFilter || 'all');
   
+  // Cache data for faster subsequent loads
   originalData = JSON.parse(JSON.stringify(data)); // Deep clone
   dashboardData = data;
   
   // Update employee filter options
   updateEmployeeFilter(data.employees || []);
   
-  // Render dashboard trực tiếp với data đã filtered từ server
-  renderDashboard(dashboardData);
-  showDashboard();
-  
-  // Update charts
-  updateCharts();
+  // Render dashboard với progressive loading
+  try {
+    renderDashboard(dashboardData);
+    showDashboard();
+    hideLoading();
+    
+    // Update charts after a short delay to improve perceived performance
+    setTimeout(() => {
+      updateCharts();
+    }, 300);
+  } catch (error) {
+    console.error('❌ Error rendering dashboard:', error);
+    hideLoading();
+    showError('Có lỗi khi hiển thị dữ liệu. Vui lòng thử lại.');
+  }
 }
 
 function onRefreshDataLoaded(data) {
@@ -499,6 +564,32 @@ function renderTimeline(timeline) {
         inner.textContent = value;
         td.classList.add('has-data');
         
+        // Kiểm tra ngày lấy máu và áp dụng màu xanh nước biển
+         const currentDay = timeline.dates[dayIndex];
+         const currentDate = `${currentMonth}/${currentDay.toString().padStart(2, '0')}/${currentYear}`;
+         
+         if (row.ngayLayMau && typeof row.ngayLayMau === 'string') {
+           // Chuẩn hóa định dạng ngày để so sánh
+           const normalizedBloodDate = normalizeDate(row.ngayLayMau);
+           const normalizedCurrentDate = normalizeDate(currentDate);
+           const normalizedStartDate = normalizeDate(row.ngayBatDau);
+           const normalizedEndDate = normalizeDate(row.ngayKetThuc);
+           
+           // Kiểm tra nếu ngày lấy máu trùng với ngày hiện tại
+           if (normalizedBloodDate === normalizedCurrentDate) {
+             // Áp dụng màu xanh nước biển nếu:
+             // 1. Ngày lấy máu = ngày bắt đầu khám
+             // 2. Ngày lấy máu nằm ngoài khoảng thời gian khám
+             const isBloodDateSameAsStart = normalizedBloodDate === normalizedStartDate;
+             const isBloodDateOutsideRange = isDateOutsideRange(normalizedBloodDate, normalizedStartDate, normalizedEndDate);
+             
+             if (isBloodDateSameAsStart || isBloodDateOutsideRange) {
+               inner.style.backgroundColor = '#fdffb6'; // Màu xanh nước biển
+               inner.style.color = '#2d6633';
+             }
+           }
+         }
+        
         // Highlight high volume (>100 people)
         if (value > 100) {
           td.classList.add('high-volume');
@@ -555,6 +646,55 @@ function formatDate(dateString) {
   } catch (e) {
     console.error('Lỗi định dạng ngày:', e);
     return dateString;
+  }
+}
+
+// Hàm chuẩn hóa định dạng ngày để so sánh
+function normalizeDate(dateString) {
+  if (!dateString) return '';
+  
+  try {
+    // Xử lý các định dạng khác nhau
+    let normalizedDate = dateString.toString().trim();
+    
+    // Nếu là định dạng mm/dd/yyyy
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(normalizedDate)) {
+      const parts = normalizedDate.split('/');
+      const month = parts[0].padStart(2, '0');
+      const day = parts[1].padStart(2, '0');
+      const year = parts[2];
+      return `${month}/${day}/${year}`;
+    }
+    
+    // Nếu là định dạng dd/mm/yyyy hoặc yyyy-mm-dd
+    const date = new Date(normalizedDate);
+    if (!isNaN(date.getTime())) {
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
+    }
+    
+    return normalizedDate;
+  } catch (e) {
+    console.error('Lỗi chuẩn hóa ngày:', e);
+    return dateString;
+  }
+}
+
+// Hàm kiểm tra ngày có nằm ngoài khoảng khám không
+function isDateOutsideRange(bloodDate, startDate, endDate) {
+  if (!bloodDate || !startDate || !endDate) return false;
+  
+  try {
+    const blood = new Date(bloodDate);
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    return blood < start || blood > end;
+  } catch (e) {
+    console.error('Lỗi so sánh ngày:', e);
+    return false;
   }
 }
 
@@ -642,6 +782,12 @@ function showCompanyDetail(companyName) {
     <div class="detail-row">
       <span class="detail-label">Nhân viên phụ trách:</span>
       <span class="detail-value">${companyDetail.employee}</span>
+    </div>
+    ` : ''}
+    ${companyDetail.ngayLayMau ? `
+    <div class="detail-row">
+      <span class="detail-label">Ngày lấy máu:</span>
+      <span class="detail-value">${formatDate(companyDetail.ngayLayMau)}</span>
     </div>
     ` : ''}
   `;
