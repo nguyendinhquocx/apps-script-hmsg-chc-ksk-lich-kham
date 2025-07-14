@@ -657,8 +657,8 @@ function renderTimeline(timeline) {
     
     // Lấy thông tin chi tiết công ty để tính tổng số người đúng
     let totalPeopleForCompany = 0;
-    if (originalData && originalData.companyDetails && originalData.companyDetails[row.company]) {
-      const companyDetail = originalData.companyDetails[row.company];
+    if (dashboardData && dashboardData.companyDetails && dashboardData.companyDetails[row.company]) {
+      const companyDetail = dashboardData.companyDetails[row.company];
       totalPeopleForCompany = companyDetail.tongNguoi || 0;
     } else {
       // Fallback: sử dụng row.total nếu không có companyDetails
@@ -832,12 +832,12 @@ function isDateOutsideRange(bloodDate, startDate, endDate) {
 
 // Modal functions
 function showCompanyDetail(companyName) {
-  if (!originalData || !originalData.companyDetails) {
+  if (!dashboardData || !dashboardData.companyDetails) {
     console.log('Không có dữ liệu chi tiết công ty');
     return;
   }
   
-  const companyDetail = originalData.companyDetails[companyName];
+  const companyDetail = dashboardData.companyDetails[companyName];
   if (!companyDetail) {
     console.log('Không tìm thấy thông tin chi tiết cho công ty:', companyName);
     return;
@@ -928,7 +928,7 @@ function showCompanyDetail(companyName) {
 }
 
 function showTotalDetail() {
-  if (!originalData || !originalData.companyDetails) {
+  if (!dashboardData || !dashboardData.companyDetails) {
     console.log('Không có dữ liệu chi tiết');
     return;
   }
@@ -942,7 +942,7 @@ function showTotalDetail() {
   if (dashboardData && dashboardData.timeline && dashboardData.timeline.rows) {
     dashboardData.timeline.rows.forEach(row => {
       if (row.company && row.company !== 'TỔNG' && !row.isSpacing) {
-        const companyDetail = originalData.companyDetails[row.company];
+        const companyDetail = dashboardData.companyDetails[row.company];
         if (companyDetail) {
           // Lấy tổng số ngày khám của công ty
           const totalDays = companyDetail.tongSoNgay || 0;
@@ -1029,7 +1029,7 @@ function showTotalDetail() {
  * Hiển thị chi tiết cho một ngày cụ thể trong hàng tổng
  */
 function showDailyTotalDetail(day, dayIndex) {
-  if (!dashboardData || !dashboardData.timeline || !originalData || !originalData.companyDetails) {
+  if (!dashboardData || !dashboardData.timeline || !dashboardData.companyDetails) {
     console.log('Không có dữ liệu chi tiết ngày');
     return;
   }

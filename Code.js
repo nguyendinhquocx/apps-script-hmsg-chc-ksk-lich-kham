@@ -467,21 +467,45 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
       console.log(`📊 Tổng - Company: ${companyName}, Total people: ${soNguoiKham}, Days in month: ${actualWorkingDaysInMonth.length}, Total days: ${tongSoNgayKham}, Period total: ${totalPeopleForPeriod}`);
     }
     
-    // Phân bổ đều số người khám cho các ngày trong target month để hiển thị
-    const peoplePerDay = actualWorkingDaysInMonth.length > 0 ? Math.ceil(totalPeopleForPeriod / actualWorkingDaysInMonth.length) : 0;
+    // Kiểm tra trạng thái công ty để xử lý logic hiển thị
+    const companyStatusValue = companyStatus.get(companyName) || '';
+    const isCompleted = companyStatusValue.toLowerCase().trim() === 'đã khám xong' || companyStatusValue.toLowerCase().trim() === 'da kham xong';
     
-    actualWorkingDaysInMonth.forEach(workDate => {
-      const dateKey = formatDateKey(workDate);
+    // Phân bổ số người khám cho các ngày
+    if (isCompleted) {
+      // Công ty đã khám xong: hiển thị số người trung bình cho những ngày thực tế đã khám
+      // Tính số người trung bình mỗi ngày dựa trên tổng số người và số ngày khám thực tế
+      const peoplePerDay = actualWorkingDaysInMonth.length > 0 ? Math.ceil(totalPeopleForPeriod / actualWorkingDaysInMonth.length) : 0;
       
-      // Đảm bảo ngày thuộc target month
-      if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
-        const companyData = companySchedules.get(companyName) || {};
-        companyData[dateKey] = (companyData[dateKey] || 0) + peoplePerDay;
-        companySchedules.set(companyName, companyData);
+      actualWorkingDaysInMonth.forEach(workDate => {
+        const dateKey = formatDateKey(workDate);
         
-        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peoplePerDay;
-      }
-    });
+        // Chỉ hiển thị cho những ngày trong khoảng thời gian khám thực tế
+        if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
+          const companyData = companySchedules.get(companyName) || {};
+          companyData[dateKey] = (companyData[dateKey] || 0) + peoplePerDay;
+          companySchedules.set(companyName, companyData);
+          
+          dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peoplePerDay;
+        }
+      });
+    } else {
+      // Công ty chưa khám xong: phân bổ đều cho tất cả các ngày trong target month
+      const peoplePerDay = actualWorkingDaysInMonth.length > 0 ? Math.ceil(totalPeopleForPeriod / actualWorkingDaysInMonth.length) : 0;
+      
+      actualWorkingDaysInMonth.forEach(workDate => {
+        const dateKey = formatDateKey(workDate);
+        
+        // Đảm bảo ngày thuộc target month
+        if (workDate.getMonth() + 1 === targetMonth && workDate.getFullYear() === targetYear) {
+          const companyData = companySchedules.get(companyName) || {};
+          companyData[dateKey] = (companyData[dateKey] || 0) + peoplePerDay;
+          companySchedules.set(companyName, companyData);
+          
+          dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + peoplePerDay;
+        }
+      });
+    }
     
     // Cập nhật tổng công ty với tổng số người trong cả giai đoạn
     const currentTotal = companyTotals.get(companyName) || 0;
