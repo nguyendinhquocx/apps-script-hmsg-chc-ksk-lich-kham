@@ -357,6 +357,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
         ngayKham: formatDate(record.ngayBatDau), // Thêm trường ngayKham
         cacNgayKhamThucTe: record.cacNgayKhamThucTe || '', // Thêm trường cacNgayKhamThucTe
         ngayLayMau: record.ngayLayMau || '', // Thêm trường ngayLayMau
+        trangThai: trangThaiKham, // Thêm trường trạng thái
         // Cận lâm sàng - Sáng
         sieuAmBungSang: 0,
         khamPhuKhoaSang: 0,
@@ -386,6 +387,7 @@ function processScheduleData(rawData, targetMonth, targetYear, showCompleted, sh
     companyDetail.chieu += chieu;
     companyDetail.tongNguoi += soNguoiKham;
     companyDetail.tongSoNgay += tongSoNgayKham;
+    companyDetail.trangThai = trangThaiKham; // Cập nhật trạng thái mới nhất
     
     // Cập nhật dữ liệu cận lâm sàng
     const clinicalFields = [
@@ -659,7 +661,8 @@ function createTimelineData(companySchedules, dailyTotals, companyTotals, month,
       total: companyTotals[companyName] || 0,
       ngayLayMau: companyDetail.ngayLayMau || '',
       ngayBatDau: companyDetail.ngayBatDau || '',
-      ngayKetThuc: companyDetail.ngayKetThuc || ''
+      ngayKetThuc: companyDetail.ngayKetThuc || '',
+      trangThai: companyDetail.trangThai || 'Chưa khám xong'
     };
     
     for (let day = 1; day <= daysInMonth; day++) {

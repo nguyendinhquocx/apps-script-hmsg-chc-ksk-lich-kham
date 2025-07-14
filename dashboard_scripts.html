@@ -566,12 +566,9 @@ function renderTimeline(timeline) {
   
   // Sắp xếp các hàng: công ty chưa khám xong trước (theo số người giảm dần), công ty đã khám xong sau (theo số người giảm dần)
   timeline.rows.sort((a, b) => {
-    // Lấy thông tin trạng thái công ty từ dashboardData
-    const companyDetailA = dashboardData && dashboardData.companyDetails && dashboardData.companyDetails[a.company];
-    const companyDetailB = dashboardData && dashboardData.companyDetails && dashboardData.companyDetails[b.company];
-    
-    const isCompletedA = companyDetailA && companyDetailA.trangThai === 'đã khám xong';
-    const isCompletedB = companyDetailB && companyDetailB.trangThai === 'đã khám xong';
+    // Lấy thông tin trạng thái công ty từ timeline row
+    const isCompletedA = a.trangThai === 'đã khám xong';
+    const isCompletedB = b.trangThai === 'đã khám xong';
     
     // Nếu một công ty đã khám xong và một công ty chưa khám xong
     if (isCompletedA && !isCompletedB) {
@@ -663,8 +660,7 @@ function renderTimeline(timeline) {
     companyCell.title = row.company; // Full name on hover
     
     // Kiểm tra nếu công ty đã khám xong thì đổi màu chữ thành xanh lá cây
-    const companyDetail = dashboardData && dashboardData.companyDetails && dashboardData.companyDetails[row.company];
-    const isCompleted = companyDetail && companyDetail.trangThai === 'đã khám xong';
+    const isCompleted = row.trangThai === 'đã khám xong';
     if (isCompleted) {
       companyCell.style.color = '#28a745'; // Màu xanh lá cây
       companyCell.style.fontWeight = 'bold';
