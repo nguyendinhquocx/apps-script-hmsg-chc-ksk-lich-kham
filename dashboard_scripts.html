@@ -7,7 +7,7 @@ function isSunday(date) {
 // Global state x.
 let currentMonth = new Date().getMonth() + 1;
 let currentYear = new Date().getFullYear();
-let showCompleted = true; // Đặt mặc định là true
+
 let showGold = false;
 let searchCompany = '';
 let filterEmployee = '';
@@ -117,11 +117,7 @@ function initializeApp() {
     }, DEBOUNCE_DELAY);
   });
   
-  // Completed filter checkbox
-  document.getElementById('showCompleted').addEventListener('change', (e) => {
-    showCompleted = e.target.checked;
-    applyFilters();
-  });
+
   
   // Gold filter checkbox
   document.getElementById('showGold').addEventListener('change', (e) => {
@@ -244,7 +240,7 @@ function loadData() {
         }, retryDelay);
       }
     })
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+    .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
   // Load clinical data with staggered timing
   setTimeout(() => {
@@ -282,7 +278,7 @@ function retryLoadData() {
       recordFailure();
       onDataError(error);
     })
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+    .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
 }
 
 // Load data với current filters
@@ -305,7 +301,7 @@ function loadDataWithCurrentFilters() {
       clearTimeout(filterTimeoutId);
       onDataError(error);
     })
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+    .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
   // Load clinical data separately with delay
   setTimeout(() => {
@@ -319,13 +315,11 @@ function refreshData() {
   // Reset all filters
   searchCompany = '';
   filterEmployee = '';
-  showCompleted = true; // Đặt mặc định là true
   showGold = false;
   shiftFilter = 'total';
   timeFilter = 'all';
   document.getElementById('companySearch').value = '';
   document.getElementById('employeeFilter').value = '';
-  document.getElementById('showCompleted').checked = true; // Đặt mặc định là checked
   document.getElementById('showGold').checked = false;
   document.getElementById('shiftFilter').value = 'total';
   document.getElementById('timeFilter').value = 'all';
@@ -1248,7 +1242,7 @@ document.addEventListener('keydown', (e) => {
         break;
       case 'f':
         e.preventDefault();
-        document.getElementById('showCompleted').click();
+        // Removed showCompleted functionality
         break;
       case 'k':
         e.preventDefault();
@@ -1300,7 +1294,7 @@ function toggleAutoRefresh() {
 // Clinical Examination Table Functions
 function loadClinicalData() {
   console.log('loadClinicalData called with params:', {
-    currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold
+    currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold
   });
   
   // Don't show loading for clinical data to avoid blocking main UI
@@ -1324,7 +1318,7 @@ function loadClinicalData() {
       // Don't call onDataError for clinical data failures
       // Just continue without clinical data
     })
-    .getClinicalData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+    .getClinicalData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
 }
 
 function onClinicalDataLoaded(data) {
@@ -1804,13 +1798,13 @@ function applyFilters() {
   google.script.run
     .withSuccessHandler(onFilterDataLoaded)
     .withFailureHandler(onDataError)
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+    .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
   
   // Cũng gọi getClinicalData với cùng các tham số filter
   google.script.run
     .withSuccessHandler(onClinicalDataLoaded)
     .withFailureHandler(onDataError)
-    .getClinicalData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+    .getClinicalData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
 }
 
 // Chart Functions

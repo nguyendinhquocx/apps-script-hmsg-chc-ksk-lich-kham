@@ -28,7 +28,7 @@ function include(filename) {
 /**
  * Lấy dữ liệu với tháng cụ thể và filter trạng thái
  */
-function getScheduleData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all', showGold = false) {
+function getScheduleData(month = null, year = null, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all', showGold = false) {
   try {
     const currentDate = new Date();
     const targetMonth = month || (currentDate.getMonth() + 1);
@@ -36,7 +36,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
     
     // Tối ưu cache key - tách thành nhiều level để tăng hiệu quả cache
     const baseCacheKey = `scheduleData_${targetYear}_${targetMonth}`;
-    const filterCacheKey = `${baseCacheKey}_${showCompleted}_${showGold}`;
+    const filterCacheKey = `${baseCacheKey}_${showGold}`;
     const searchCacheKey = searchCompany ? `_search_${searchCompany.substring(0, 10)}` : '';
     const employeeCacheKey = filterEmployee ? `_emp_${filterEmployee.substring(0, 10)}` : '';
     const cacheKey = `${filterCacheKey}${searchCacheKey}${employeeCacheKey}_${shiftFilter}_${timeFilter}`;
@@ -48,7 +48,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
       return JSON.parse(cachedData);
     }
 
-    console.log(`Lấy dữ liệu tháng ${targetMonth}/${targetYear}, showCompleted: ${showCompleted}, shiftFilter: ${shiftFilter}, timeFilter: ${timeFilter}, showGold: ${showGold}`);
+    console.log(`Lấy dữ liệu tháng ${targetMonth}/${targetYear}, shiftFilter: ${shiftFilter}, timeFilter: ${timeFilter}, showGold: ${showGold}`);
     
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
     const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
@@ -120,7 +120,7 @@ function getScheduleData(month = null, year = null, showCompleted = false, searc
     console.log(`Dữ liệu sau filter: ${filteredData.length} records`);
 
     // Tổng hợp dữ liệu với shiftFilter, timeFilter và showGold
-    const processedData = processScheduleData(filteredData, targetMonth, targetYear, showCompleted, shiftFilter, timeFilter, showGold);
+    const processedData = processScheduleData(filteredData, targetMonth, targetYear, shiftFilter, timeFilter, showGold);
     
     // Cache kết quả
     cache.put(cacheKey, JSON.stringify(processedData), CONFIG.CACHE_DURATION);
@@ -261,7 +261,7 @@ function parseActualExamDates(actualDatesStr, targetYear, targetMonth) {
 /**
  * 🔧 FIX: Xử lý dữ liệu với logic ĐÚNG cho cross-month scheduling
  */
-function processScheduleData(rawData, targetMonth, targetYear, showCompleted, shiftFilter = 'total', timeFilter = 'all', showGold = false) {
+function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'total', timeFilter = 'all', showGold = false) {
   // Tối ưu: Sử dụng Map thay vì Object để tăng hiệu suất
   const companySchedules = new Map();
   const dailyTotals = new Map();
@@ -647,9 +647,23 @@ function createTimelineData(companySchedules, dailyTotals, companyTotals, month,
     weekdays.push(weekday);
   }
   
-  // Sắp xếp công ty theo tổng số người khám (ít nhất ở trên, nhiều nhất ở dưới)
+  // Sắp xếp công ty: 'Chưa khám xong' trước, 'Đã khám xong' sau, cả hai nhóm sắp xếp theo số người giảm dần
   const sortedCompanies = Object.keys(companySchedules).sort((a, b) => {
-    return (companyTotals[a] || 0) - (companyTotals[b] || 0);
+    const detailA = companyDetails[a] || {};
+    const detailB = companyDetails[b] || {};
+    const statusA = (detailA.trangThai || '').toLowerCase().trim();
+    const statusB = (detailB.trangThai || '').toLowerCase().trim();
+    
+    const isCompletedA = statusA === 'đã khám xong' || statusA === 'da kham xong';
+    const isCompletedB = statusB === 'đã khám xong' || statusB === 'da kham xong';
+    
+    // Nếu một bên đã khám xong, một bên chưa khám xong
+    if (isCompletedA !== isCompletedB) {
+      return isCompletedA ? 1 : -1; // Chưa khám xong (false) lên trước
+    }
+    
+    // Cùng trạng thái thì sắp xếp theo số người giảm dần
+    return (companyTotals[b] || 0) - (companyTotals[a] || 0);
   });
   
   sortedCompanies.forEach(companyName => {
@@ -905,10 +919,10 @@ function getCurrentUser() {
 /**
  * Lấy dữ liệu cận lâm sàng cho bảng hiển thị theo ngày
  */
-function getClinicalData(month = null, year = null, showCompleted = false, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all', showGold = false) {
+function getClinicalData(month = null, year = null, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all', showGold = false) {
   try {
-    // Lấy dữ liệu với tham số showCompleted và showGold được truyền vào
-    const scheduleData = getScheduleData(month, year, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+    // Lấy dữ liệu với tham số showGold được truyền vào
+    const scheduleData = getScheduleData(month, year, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
     
     if (!scheduleData.success) {
       return scheduleData;
