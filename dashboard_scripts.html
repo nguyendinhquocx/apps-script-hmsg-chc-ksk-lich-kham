@@ -118,54 +118,121 @@ function loadCurrentMonth() {
   loadData();
 }
 
-function loadData() {
-  console.log('loadData called');
-  showLoading();
-  
-  // Thêm timeout và retry logic
-  const timeoutId = setTimeout(() => {
-    console.warn('⚠️ API call timeout after 15 seconds');
-    hideLoading();
-    showError('Tải dữ liệu quá lâu. Vui lòng thử lại.');
-  }, 15000);
-  
-  google.script.run
-    .withSuccessHandler((data) => {
-      clearTimeout(timeoutId);
-      onDataLoaded(data);
-    })
-    .withFailureHandler((error) => {
-      clearTimeout(timeoutId);
-      console.error('❌ First attempt failed:', error);
-      // Retry once after 2 seconds
-      setTimeout(() => {
-        console.log('🔄 Retrying data load...');
-        retryLoadData();
-      }, 2000);
-    })
-    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
-  
-  // Load clinical data separately to avoid blocking
-  setTimeout(() => {
-    console.log('Calling loadClinicalData...');
-    loadClinicalData();
-  }, 1000);
+// Circuit breaker pattern for API calls
+let failureCount = 0;
+let lastFailureTime = 0;
+const CIRCUIT_BREAKER_THRESHOLD = 3;
+const CIRCUIT_BREAKER_TIMEOUT = 30000; // 30 seconds
+
+function isCircuitBreakerOpen() {
+  if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
+    const timeSinceLastFailure = Date.now() - lastFailureTime;
+    if (timeSinceLastFailure < CIRCUIT_BREAKER_TIMEOUT) {
+      return true;
+    } else {
+      // Reset circuit breaker after timeout
+      failureCount = 0;
+    }
+  }
+  return false;
 }
 
-function retryLoadData() {
-  const retryTimeoutId = setTimeout(() => {
-    console.warn('⚠️ Retry timeout after 10 seconds');
+function recordFailure() {
+  failureCount++;
+  lastFailureTime = Date.now();
+}
+
+function recordSuccess() {
+  failureCount = 0;
+}
+
+function loadData() {
+  console.log('loadData called');
+  
+  // Check circuit breaker
+  if (isCircuitBreakerOpen()) {
+    showError('Hệ thống tạm thời không khả dụng. Vui lòng thử lại sau 30 giây.');
+    return;
+  }
+  
+  showLoading();
+  
+  // Progressive loading with shorter initial timeout
+  const timeoutId = setTimeout(() => {
+    console.warn('⚠️ API call timeout after 10 seconds');
     hideLoading();
-    showError('Không thể tải dữ liệu. Vui lòng kiểm tra kết nối và thử lại.');
+    recordFailure();
+    showError('Tải dữ liệu quá lâu. Đang thử lại...');
+    
+    // Auto retry with exponential backoff
+    const retryDelay = Math.min(2000 * Math.pow(2, failureCount - 1), 10000);
+    setTimeout(() => {
+      retryLoadData();
+    }, retryDelay);
   }, 10000);
   
   google.script.run
     .withSuccessHandler((data) => {
+      clearTimeout(timeoutId);
+      recordSuccess();
+      onDataLoaded(data);
+    })
+    .withFailureHandler((error) => {
+      clearTimeout(timeoutId);
+      recordFailure();
+      console.error('❌ First attempt failed:', error);
+      
+      // Immediate retry for network errors
+      if (error.message && error.message.includes('network')) {
+        setTimeout(() => {
+          console.log('🔄 Network retry...');
+          retryLoadData();
+        }, 1000);
+      } else {
+        // Exponential backoff for other errors
+        const retryDelay = Math.min(2000 * Math.pow(2, failureCount - 1), 8000);
+        setTimeout(() => {
+          console.log('🔄 Retrying data load...');
+          retryLoadData();
+        }, retryDelay);
+      }
+    })
+    .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
+  
+  // Load clinical data with staggered timing
+  setTimeout(() => {
+    console.log('Calling loadClinicalData...');
+    loadClinicalData();
+  }, 500);
+}
+
+function retryLoadData() {
+  // Shorter timeout for retry attempts
+  const retryTimeoutId = setTimeout(() => {
+    console.warn('⚠️ Retry timeout after 8 seconds');
+    hideLoading();
+    recordFailure();
+    
+    if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
+      showError('Hệ thống tạm thời không khả dụng. Vui lòng thử lại sau.');
+    } else {
+      showError('Không thể tải dữ liệu. Đang thử lại...');
+      // Auto retry with longer delay
+      setTimeout(() => {
+        retryLoadData();
+      }, 5000);
+    }
+  }, 8000);
+  
+  google.script.run
+    .withSuccessHandler((data) => {
       clearTimeout(retryTimeoutId);
+      recordSuccess();
       onDataLoaded(data);
     })
     .withFailureHandler((error) => {
       clearTimeout(retryTimeoutId);
+      recordFailure();
       onDataError(error);
     })
     .getScheduleData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
@@ -238,19 +305,25 @@ function onDataLoaded(data) {
   originalData = JSON.parse(JSON.stringify(data)); // Deep clone
   dashboardData = data;
   
-  // Update employee filter options
-  updateEmployeeFilter(data.employees || []);
-  
-  // Render dashboard với progressive loading
+  // Progressive rendering for better UX
   try {
-    renderDashboard(dashboardData);
+    // Step 1: Show basic dashboard structure immediately
     showDashboard();
     hideLoading();
     
-    // Update charts after a short delay to improve perceived performance
+    // Step 2: Update filters (fast operation)
+    updateEmployeeFilter(data.employees || []);
+    
+    // Step 3: Render main content with micro-delays for smooth UX
+    setTimeout(() => {
+      renderDashboard(dashboardData);
+    }, 50);
+    
+    // Step 4: Update charts after main content is rendered
     setTimeout(() => {
       updateCharts();
-    }, 300);
+    }, 200);
+    
   } catch (error) {
     console.error('❌ Error rendering dashboard:', error);
     hideLoading();
@@ -560,35 +633,39 @@ function renderTimeline(timeline) {
       const inner = document.createElement('div');
       inner.classList.add('data-cell-inner');
       
+      // Kiểm tra ngày lấy máu trước khi xử lý dữ liệu khám
+      const currentDay = timeline.dates[dayIndex];
+      const currentDate = `${currentMonth}/${currentDay.toString().padStart(2, '0')}/${currentYear}`;
+      let isBloodDate = false;
+      
+      if (row.ngayLayMau && typeof row.ngayLayMau === 'string') {
+        // Chuẩn hóa định dạng ngày để so sánh
+        const normalizedBloodDate = normalizeDate(row.ngayLayMau);
+        const normalizedCurrentDate = normalizeDate(currentDate);
+        const normalizedStartDate = normalizeDate(row.ngayBatDau);
+        const normalizedEndDate = normalizeDate(row.ngayKetThuc);
+        
+        // Kiểm tra nếu ngày lấy máu trùng với ngày hiện tại
+        if (normalizedBloodDate === normalizedCurrentDate) {
+          isBloodDate = true;
+          // Áp dụng màu vàng cho ngày lấy máu
+          inner.style.backgroundColor = '#fdffb6';
+          inner.style.color = '#2d6633';
+          
+          // Nếu không có dữ liệu khám nhưng là ngày lấy máu, chỉ hiển thị màu nền
+          if (value === 0) {
+            inner.textContent = ''; // Loại bỏ dấu chấm đen
+            inner.style.fontSize = '14px';
+            inner.style.fontWeight = 'bold';
+            td.classList.add('blood-date-only');
+            td.title = `${row.company}\nNgày lấy máu: ${formatDate(row.ngayLayMau)}`;
+          }
+        }
+      }
+      
       if (value > 0) {
         inner.textContent = value;
         td.classList.add('has-data');
-        
-        // Kiểm tra ngày lấy máu và áp dụng màu xanh nước biển
-         const currentDay = timeline.dates[dayIndex];
-         const currentDate = `${currentMonth}/${currentDay.toString().padStart(2, '0')}/${currentYear}`;
-         
-         if (row.ngayLayMau && typeof row.ngayLayMau === 'string') {
-           // Chuẩn hóa định dạng ngày để so sánh
-           const normalizedBloodDate = normalizeDate(row.ngayLayMau);
-           const normalizedCurrentDate = normalizeDate(currentDate);
-           const normalizedStartDate = normalizeDate(row.ngayBatDau);
-           const normalizedEndDate = normalizeDate(row.ngayKetThuc);
-           
-           // Kiểm tra nếu ngày lấy máu trùng với ngày hiện tại
-           if (normalizedBloodDate === normalizedCurrentDate) {
-             // Áp dụng màu xanh nước biển nếu:
-             // 1. Ngày lấy máu = ngày bắt đầu khám
-             // 2. Ngày lấy máu nằm ngoài khoảng thời gian khám
-             const isBloodDateSameAsStart = normalizedBloodDate === normalizedStartDate;
-             const isBloodDateOutsideRange = isDateOutsideRange(normalizedBloodDate, normalizedStartDate, normalizedEndDate);
-             
-             if (isBloodDateSameAsStart || isBloodDateOutsideRange) {
-               inner.style.backgroundColor = '#fdffb6'; // Màu xanh nước biển
-               inner.style.color = '#2d6633';
-             }
-           }
-         }
         
         // Highlight high volume (>100 people)
         if (value > 100) {
@@ -596,10 +673,13 @@ function renderTimeline(timeline) {
         }
         
         // Add tooltip
-        const tooltipText = createTooltip(row.company, timeline.dates[dayIndex], value);
+        let tooltipText = createTooltip(row.company, timeline.dates[dayIndex], value);
+        if (isBloodDate) {
+          tooltipText += `\nNgày lấy máu: ${formatDate(row.ngayLayMau)}`;
+        }
         td.title = tooltipText;
         
-      } else {
+      } else if (!isBloodDate) {
         inner.textContent = '';
         td.classList.add('empty');
       }
@@ -1112,33 +1192,76 @@ window.addEventListener('error', (e) => {
   }
 });
 
-// Auto-refresh every 5 minutes
+// Smart auto-refresh with user activity detection
+let lastUserActivity = Date.now();
+let autoRefreshEnabled = true;
+
+// Track user activity
+['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+  document.addEventListener(event, () => {
+    lastUserActivity = Date.now();
+  }, { passive: true });
+});
+
+// Auto-refresh only when user is inactive for 2+ minutes
 setInterval(() => {
-  if (document.getElementById('dashboard').style.display === 'block') {
+  const timeSinceActivity = Date.now() - lastUserActivity;
+  const isUserIdle = timeSinceActivity > 2 * 60 * 1000; // 2 minutes
+  
+  if (autoRefreshEnabled && 
+      isUserIdle && 
+      document.getElementById('dashboard').style.display === 'block' &&
+      !isCircuitBreakerOpen()) {
+    console.log('🔄 Auto-refreshing data (user idle)');
     loadData();
   }
-}, 5 * 60 * 1000);
+}, 5 * 60 * 1000); // Check every 5 minutes
+
+// Allow users to disable auto-refresh
+function toggleAutoRefresh() {
+  autoRefreshEnabled = !autoRefreshEnabled;
+  console.log('Auto-refresh:', autoRefreshEnabled ? 'enabled' : 'disabled');
+}
 
 // Clinical Examination Table Functions
 function loadClinicalData() {
   console.log('loadClinicalData called with params:', {
     currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold
   });
-  showLoading();
+  
+  // Don't show loading for clinical data to avoid blocking main UI
+  // showLoading();
+  
+  // Add timeout for clinical data
+  const clinicalTimeoutId = setTimeout(() => {
+    console.warn('⚠️ Clinical data timeout after 8 seconds');
+    // Don't show error for clinical data timeout, just log it
+    console.log('Clinical data load timed out, continuing without it');
+  }, 8000);
   
   google.script.run
-    .withSuccessHandler(onClinicalDataLoaded)
-    .withFailureHandler(onDataError)
+    .withSuccessHandler((data) => {
+      clearTimeout(clinicalTimeoutId);
+      onClinicalDataLoaded(data);
+    })
+    .withFailureHandler((error) => {
+      clearTimeout(clinicalTimeoutId);
+      console.warn('Clinical data load failed:', error);
+      // Don't call onDataError for clinical data failures
+      // Just continue without clinical data
+    })
     .getClinicalData(currentMonth, currentYear, showCompleted, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
 }
 
 function onClinicalDataLoaded(data) {
   console.log('onClinicalDataLoaded called with:', data);
-  hideLoading();
+  // Don't hide loading here as it might interfere with main data loading
+  // hideLoading();
   
   if (!data.success) {
     console.log('Clinical data load failed:', data.error);
-    showError(data.error || 'Có lỗi xảy ra khi tải dữ liệu cận lâm sàng');
+    // Don't show error for clinical data, just log it
+    console.warn('Clinical data unavailable:', data.error);
     return;
   }
   
@@ -1146,10 +1269,16 @@ function onClinicalDataLoaded(data) {
   clinicalData = data;
   console.log('clinicalData saved:', clinicalData);
   
-  renderClinicalTable(data);
-  
-  // Update charts
-  updateCharts();
+  // Render clinical table asynchronously
+  setTimeout(() => {
+    try {
+      renderClinicalTable(data);
+      // Update charts after clinical data is rendered
+      updateCharts();
+    } catch (error) {
+      console.error('Error rendering clinical data:', error);
+    }
+  }, 100);
 }
 
 function renderClinicalTable(clinicalData = null) {

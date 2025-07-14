@@ -519,6 +519,29 @@ body {
   border: none;
 }
 
+/* Blood date only styling */
+.data-cell.blood-date-only .data-cell-inner {
+  background: #fdffb6 !important;
+  color: #2d6633 !important;
+  border: 2px solid #fbbf24 !important;
+  font-weight: 800;
+  font-size: 20px !important;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+  }
+}
+
 /* Weekend styling */
 .weekend {
   background: #ffffff !important;
