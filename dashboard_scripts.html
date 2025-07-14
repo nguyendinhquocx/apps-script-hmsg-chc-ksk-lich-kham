@@ -1918,8 +1918,8 @@ function applyFilters() {
     return;
   }
   
-  // Chỉ filter client-side cho Gold checkbox để tránh server call không cần thiết
-  if (showGold !== undefined && searchCompany === '' && filterEmployee === '') {
+  // Chỉ filter client-side cho Gold checkbox khi có originalData và không có filter khác
+  if (showGold !== undefined && searchCompany === '' && filterEmployee === '' && originalData && originalData.timeline) {
     console.log('🔧 Applying Gold filter client-side');
     
     // Filter dữ liệu từ cache originalData thay vì gọi server

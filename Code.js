@@ -94,8 +94,10 @@ function getScheduleData(month = null, year = null, searchCompany = '', filterEm
       }
       
       // Employee filter
-      if (filterEmployee && record.tenNhanVien && !record.tenNhanVien.toLowerCase().includes(filterEmployee.toLowerCase())) {
-        return false;
+      if (filterEmployee && filterEmployee.trim() !== '') {
+        if (!record.tenNhanVien || !record.tenNhanVien.toLowerCase().includes(filterEmployee.toLowerCase())) {
+          return false;
+        }
       }
       
       // Gold filter
