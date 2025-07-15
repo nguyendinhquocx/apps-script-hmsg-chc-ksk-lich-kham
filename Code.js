@@ -30,6 +30,10 @@ function include(filename) {
  */
 function getScheduleData(month = null, year = null, searchCompany = '', filterEmployee = '', shiftFilter = 'total', timeFilter = 'all', showGold = false) {
   try {
+    // Thêm timeout protection
+    const startTime = new Date().getTime();
+    const MAX_EXECUTION_TIME = 25000; // 25 giây max
+    
     const currentDate = new Date();
     const targetMonth = month || (currentDate.getMonth() + 1);
     const targetYear = year || currentDate.getFullYear();
@@ -47,8 +51,19 @@ function getScheduleData(month = null, year = null, searchCompany = '', filterEm
       console.log('Sử dụng dữ liệu từ cache cho shift:', shiftFilter, 'và timeFilter:', timeFilter);
       return JSON.parse(cachedData);
     }
+    
+    // Kiểm tra thời gian thực thi
+    function checkExecutionTime() {
+      const currentTime = new Date().getTime();
+      if (currentTime - startTime > MAX_EXECUTION_TIME) {
+        throw new Error('Execution timeout - dữ liệu quá lớn, vui lòng thử lại');
+      }
+    }
 
     console.log(`Lấy dữ liệu tháng ${targetMonth}/${targetYear}, shiftFilter: ${shiftFilter}, timeFilter: ${timeFilter}, showGold: ${showGold}`);
+    
+    // Kiểm tra thời gian thực thi
+    checkExecutionTime();
     
     const ss = SpreadsheetApp.openById(CONFIG.SHEET_ID);
     const sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
@@ -57,6 +72,9 @@ function getScheduleData(month = null, year = null, searchCompany = '', filterEm
       throw new Error(`Không tìm thấy sheet '${CONFIG.SHEET_NAME}'`);
     }
 
+    // Kiểm tra thời gian thực thi trước khi đọc dữ liệu
+    checkExecutionTime();
+    
     const range = sheet.getDataRange();
     const values = range.getValues();
     
@@ -67,8 +85,13 @@ function getScheduleData(month = null, year = null, searchCompany = '', filterEm
     const headers = values[0];
     const columnIndexes = getColumnIndexes(headers);
     
-    // Xử lý dữ liệu thô
-    const rawData = values.slice(1).map(row => {
+    // Xử lý dữ liệu thô với timeout check
+    const rawData = values.slice(1).map((row, index) => {
+      // Kiểm tra timeout mỗi 100 records
+      if (index % 100 === 0) {
+        checkExecutionTime();
+      }
+      
       const record = {};
       Object.keys(columnIndexes).forEach(key => {
         const value = row[columnIndexes[key]];

@@ -21,10 +21,13 @@ let clinicalData = null;
 let totalPeopleChart = null;
 let clinicalMaxChart = null;
 
-// Debounce variables với tối ưu hóa
-let debounceTimer = null;
-let filterDebounceTimer = null;
-const DEBOUNCE_DELAY = 300; // Giảm từ 500ms xuống 300ms để phản hồi nhanh hơn
+// Debounce variables với tối ưu hóa - tách riêng cho từng filter
+let searchDebounceTimer = null;
+let employeeDebounceTimer = null;
+let shiftDebounceTimer = null;
+let timeDebounceTimer = null;
+let goldDebounceTimer = null;
+const DEBOUNCE_DELAY = 500; // Tăng lên 500ms để tránh spam requests
 
 // Cache và performance optimization
 let dataCache = {};
@@ -52,7 +55,7 @@ setInterval(() => {
   }
 }, 60000); // Check every minute
 
-// Initialize
+// Initialize với safety mechanism
 document.addEventListener('DOMContentLoaded', function() {
   initializeApp();
   loadCurrentMonth();
@@ -68,87 +71,95 @@ function initializeApp() {
     navigateMonth(1);
   });
   
-  // Search input - debounced search
+  // Search input - debounced search với timer riêng
   const searchInput = document.getElementById('companySearch');
   searchInput.addEventListener('input', (e) => {
     const value = e.target.value.trim();
     
-    // Clear previous debounce timer
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
+    // Clear previous search timer
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
     }
     
-    // Set new debounce timer
-    debounceTimer = setTimeout(() => {
+    // Set new search timer
+    searchDebounceTimer = setTimeout(() => {
       searchCompany = value;
-      applyFilters();
+      console.log('🔍 Search filter changed:', searchCompany);
+      loadDataWithCurrentFilters();
     }, DEBOUNCE_DELAY);
   });
   
   // Also handle Enter key for immediate search
   searchInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
       }
       searchCompany = e.target.value.trim();
-      applyFilters();
+      console.log('🔍 Search filter (Enter):', searchCompany);
+      loadDataWithCurrentFilters();
     }
   });
   
-  // Employee filter - debounced response
+  // Employee filter - với timer riêng
   document.getElementById('employeeFilter').addEventListener('change', (e) => {
     filterEmployee = e.target.value;
+    console.log('👤 Employee filter changed:', filterEmployee);
     
-    // Clear previous filter debounce timer
-    if (filterDebounceTimer) {
-      clearTimeout(filterDebounceTimer);
+    // Clear previous employee timer
+    if (employeeDebounceTimer) {
+      clearTimeout(employeeDebounceTimer);
     }
     
-    // Set new filter debounce timer
-    filterDebounceTimer = setTimeout(() => {
-      applyFilters();
+    // Set employee timer
+    employeeDebounceTimer = setTimeout(() => {
+      loadDataWithCurrentFilters();
     }, DEBOUNCE_DELAY);
   });
   
-  // Shift filter - debounced response với server call
+  // Shift filter - với timer riêng
   document.getElementById('shiftFilter').addEventListener('change', (e) => {
     shiftFilter = e.target.value;
-    console.log('🔧 Đã chọn shift filter: ' + shiftFilter);
+    console.log('🔧 Shift filter changed:', shiftFilter);
     
-    // Clear previous filter debounce timer
-    if (filterDebounceTimer) {
-      clearTimeout(filterDebounceTimer);
+    // Clear previous shift timer
+    if (shiftDebounceTimer) {
+      clearTimeout(shiftDebounceTimer);
     }
     
-    // Set new filter debounce timer
-    filterDebounceTimer = setTimeout(() => {
+    shiftDebounceTimer = setTimeout(() => {
       loadDataWithCurrentFilters();
     }, DEBOUNCE_DELAY);
   });
   
-  // Time filter - debounced response với server call
+  // Time filter - với timer riêng
   document.getElementById('timeFilter').addEventListener('change', (e) => {
     timeFilter = e.target.value;
-    console.log('🔧 Đã chọn time filter: ' + timeFilter);
+    console.log('⏰ Time filter changed:', timeFilter);
     
-    // Clear previous filter debounce timer
-    if (filterDebounceTimer) {
-      clearTimeout(filterDebounceTimer);
+    // Clear previous time timer
+    if (timeDebounceTimer) {
+      clearTimeout(timeDebounceTimer);
     }
     
-    // Set new filter debounce timer
-    filterDebounceTimer = setTimeout(() => {
+    timeDebounceTimer = setTimeout(() => {
       loadDataWithCurrentFilters();
     }, DEBOUNCE_DELAY);
   });
   
-
-  
-  // Gold filter checkbox
+  // Gold filter checkbox - với timer riêng
   document.getElementById('showGold').addEventListener('change', (e) => {
     showGold = e.target.checked;
-    applyFilters();
+    console.log('⭐ Gold filter changed:', showGold);
+    
+    // Clear previous gold timer
+    if (goldDebounceTimer) {
+      clearTimeout(goldDebounceTimer);
+    }
+    
+    goldDebounceTimer = setTimeout(() => {
+      loadDataWithCurrentFilters();
+    }, DEBOUNCE_DELAY);
   });
   
   updateMonthDisplay();
@@ -191,11 +202,11 @@ function loadCurrentMonth() {
   loadData();
 }
 
-// Circuit breaker pattern for API calls
+// Circuit breaker pattern for API calls - Tối ưu hóa
 let failureCount = 0;
 let lastFailureTime = 0;
-const CIRCUIT_BREAKER_THRESHOLD = 3;
-const CIRCUIT_BREAKER_TIMEOUT = 60000; // 60 seconds - tăng timeout để xử lý dữ liệu lớn
+const CIRCUIT_BREAKER_THRESHOLD = 5; // Tăng từ 3 lên 5
+const CIRCUIT_BREAKER_TIMEOUT = 30000; // Giảm từ 60s xuống 30s
 
 function isCircuitBreakerOpen() {
   if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
@@ -252,20 +263,17 @@ function loadData() {
   pendingRequests++;
   showLoading();
   
-  // Giảm timeout để phản hồi nhanh hơn
+  // Tăng timeout cho dữ liệu lớn
   const timeoutId = setTimeout(() => {
-    console.warn('⚠️ API call timeout after 10 seconds');
+    console.warn('⚠️ API call timeout after 20 seconds');
     hideLoading();
     isLoading = false;
     recordFailure();
-    showError('Tải dữ liệu quá lâu. Đang thử lại...');
+    showError('Tải dữ liệu quá lâu. Vui lòng thử lại.');
     
-    // Auto retry với delay ngắn hơn
-    const retryDelay = Math.min(1500 * Math.pow(2, failureCount - 1), 6000);
-    setTimeout(() => {
-      retryLoadData();
-    }, retryDelay);
-  }, 10000); // Giảm từ 15s xuống 10s
+    // Không auto retry để tránh vòng lặp vô tận
+    // Người dùng sẽ phải click thử lại thủ công
+  }, 20000); // Tăng lên 20s cho dữ liệu lớn
   
   google.script.run
     .withSuccessHandler((data) => {
@@ -310,31 +318,32 @@ function loadData() {
 }
 
 function retryLoadData() {
-  // Shorter timeout for retry attempts
-  const retryTimeoutId = setTimeout(() => {
-    console.warn('⚠️ Retry timeout after 8 seconds');
+  // Prevent infinite retry loops
+  if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
     hideLoading();
+    showError('Hệ thống tạm thời không khả dụng. Vui lòng thử lại sau.');
+    return;
+  }
+  
+  // Timeout cho retry attempts
+  const retryTimeoutId = setTimeout(() => {
+    console.warn('⚠️ Retry timeout after 15 seconds');
+    hideLoading();
+    isLoading = false;
     recordFailure();
-    
-    if (failureCount >= CIRCUIT_BREAKER_THRESHOLD) {
-      showError('Hệ thống tạm thời không khả dụng. Vui lòng thử lại sau.');
-    } else {
-      showError('Không thể tải dữ liệu. Đang thử lại...');
-      // Auto retry with longer delay
-      setTimeout(() => {
-        retryLoadData();
-      }, 5000);
-    }
-  }, 12000); // 12 second timeout - tăng cho retry
+    showError('Không thể tải dữ liệu. Vui lòng thử lại thủ công.');
+  }, 15000); // Tăng timeout cho retry
   
   google.script.run
     .withSuccessHandler((data) => {
       clearTimeout(retryTimeoutId);
+      isLoading = false;
       recordSuccess();
       onDataLoaded(data);
     })
     .withFailureHandler((error) => {
       clearTimeout(retryTimeoutId);
+      isLoading = false;
       recordFailure();
       onDataError(error);
     })
@@ -365,18 +374,16 @@ function loadDataWithCurrentFilters() {
   isLoading = true;
   showLoading();
   
-  // Giảm timeout xuống để phản hồi nhanh hơn
+  // Timeout cho filter loading
   const filterTimeoutId = setTimeout(() => {
-    console.warn('⚠️ Filter loading timeout after 8 seconds');
+    console.warn('⚠️ Filter loading timeout after 15 seconds');
     hideLoading();
     isLoading = false;
-    showError('Tải dữ liệu lọc quá lâu. Đang thử lại...');
+    recordFailure();
+    showError('Tải dữ liệu lọc quá lâu. Vui lòng thử lại thủ công.');
     
-    // Auto retry với delay ngắn
-    setTimeout(() => {
-      loadDataWithCurrentFilters();
-    }, 1500);
-  }, 8000); // Giảm từ 12s xuống 8s
+    // Không auto retry để tránh vòng lặp vô tận
+  }, 15000); // Tăng timeout lên 15s
   
   google.script.run
     .withSuccessHandler((data) => {
@@ -1908,9 +1915,9 @@ function showClinicalColumnDetail(columnKey, columnLabel) {
   document.getElementById('detailModal').classList.add('show');
 }
 
-// Tối ưu hóa applyFilters - chỉ filter client-side cho Gold checkbox
+// Đơn giản hóa applyFilters - luôn gọi server để đảm bảo consistency
 function applyFilters() {
-  if (!originalData) return;
+  console.log('🔧 Applying filters:', { searchCompany, filterEmployee, shiftFilter, timeFilter, showGold });
   
   // Prevent multiple simultaneous filter requests
   if (isLoading) {
@@ -1918,52 +1925,8 @@ function applyFilters() {
     return;
   }
   
-  // Chỉ filter client-side cho Gold checkbox khi có originalData và không có filter khác
-  if (showGold !== undefined && searchCompany === '' && filterEmployee === '' && originalData && originalData.timeline) {
-    console.log('🔧 Applying Gold filter client-side');
-    
-    // Filter dữ liệu từ cache originalData thay vì gọi server
-    const filteredData = JSON.parse(JSON.stringify(originalData)); // Deep clone
-    
-    // Apply Gold filter client-side - phải phù hợp với server-side logic
-    if (filteredData.timeline && filteredData.timeline.rows) {
-      filteredData.timeline.rows = filteredData.timeline.rows.filter(row => {
-        if (!showGold) return true; // Hiển thị tất cả nếu không check Gold
-        
-        // Kiểm tra cột 'gold' có đánh dấu 'x' hay không (phù hợp với server-side)
-        const companyDetail = filteredData.companyDetails && filteredData.companyDetails[row.company];
-        const goldValue = companyDetail && companyDetail.gold ? companyDetail.gold.toString().toLowerCase().trim() : '';
-        const hasGoldMark = goldValue === 'x';
-        
-        // Chỉ hiển thị công ty có đánh dấu 'x' trong cột gold khi check Gold
-        return hasGoldMark;
-      });
-    }
-    
-    // Render ngay lập tức từ dữ liệu đã filter
-    dashboardData = filteredData;
-    renderDashboard(dashboardData);
-    updateCharts();
-    return;
-  }
-  
-  // Chỉ gọi server khi thực sự cần thiết (search, employee filter, shift, time)
-  console.log('🔧 Applying filters with server call');
-  isLoading = true;
-  showLoading();
-  
-  google.script.run
-    .withSuccessHandler((data) => {
-      isLoading = false;
-      onFilterDataLoaded(data);
-    })
-    .withFailureHandler((error) => {
-      isLoading = false;
-      onDataError(error);
-    })
-    .getScheduleData(currentMonth, currentYear, searchCompany, filterEmployee, shiftFilter, timeFilter, showGold);
-  
-  // Gọi getClinicalData với delay để tránh overload
+  // Luôn gọi server để đảm bảo dữ liệu chính xác
+  loadDataWithCurrentFilters();
   setTimeout(() => {
     google.script.run
       .withSuccessHandler(onClinicalDataLoaded)
