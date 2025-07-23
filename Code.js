@@ -1,6 +1,6 @@
 /**
  * Lịch khám sức khoẻ công ty - HMSG CHC QUOC NGUYEN X
- * Phiên bản 2.5 - Fix UI dropdown styling + Cross-month logic
+ * Phiên bản 2.5 - Fix UI dropdown styling + Cross-month logic.
  * Tác giả: Quoc Nguyen
  * Ngày: 2025-07-05
  */
@@ -96,7 +96,7 @@ function getScheduleData(month = null, year = null, searchCompany = '', filterEm
       Object.keys(columnIndexes).forEach(key => {
         const value = row[columnIndexes[key]];
         // Chuyển đổi số cho các cột cận lâm sàng
-        if (key.includes('sieuAm') || key.includes('khamPhuKhoa') || key.includes('xQuang') || key.includes('dienTamDo')) {
+        if (key.includes('sieuAm') || key.includes('khamPhuKhoa') || key.includes('xQuang') || key.includes('dienTamDo') || key.includes('doLoang')) {
           record[key] = parseInt(value) || 0;
         } else {
           record[key] = value || '';
@@ -193,6 +193,8 @@ function getColumnIndexes(headers) {
     'sieuAmTimSang': ['sieu am tim sang'],
     'sieuAmDongMachCanhSang': ['sieu am dong mach canh sang'],
     'sieuAmDanHoiMoGanSang': ['sieu am dan hoi mo gan sang'],
+    'sieuAmDauDoAmDaoSang': ['sieu am dau do am dao sang'],
+    'doLoangXuongSang': ['do loang xuong sang'],
     // Cận lâm sàng - Chiều
     'sieuAmBungChieu': ['sieu am bung chieu'],
     'khamPhuKhoaChieu': ['kham phu khoa chieu'],
@@ -202,7 +204,9 @@ function getColumnIndexes(headers) {
     'sieuAmGiapChieu': ['sieu am giap chieu'],
     'sieuAmTimChieu': ['sieu am tim chieu'],
     'sieuAmDongMachCanhChieu': ['sieu am dong mach canh chieu'],
-    'sieuAmDanHoiMoGanChieu': ['sieu am dan hoi mo gan chieu']
+    'sieuAmDanHoiMoGanChieu': ['sieu am dan hoi mo gan chieu'],
+    'sieuAmDauDoAmDaoChieu': ['sieu am dau do am dao chieu'],
+    'doLoangXuongChieu': ['do loang xuong chieu']
   };
   
   const indexes = {};
@@ -424,6 +428,8 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
         sieuAmTimSang: 0,
         sieuAmDongMachCanhSang: 0,
         sieuAmDanHoiMoGanSang: 0,
+        sieuAmDauDoAmDaoSang: 0,
+        doLoangXuongSang: 0,
         // Cận lâm sàng - Chiều
         sieuAmBungChieu: 0,
         khamPhuKhoaChieu: 0,
@@ -433,7 +439,9 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
         sieuAmGiapChieu: 0,
         sieuAmTimChieu: 0,
         sieuAmDongMachCanhChieu: 0,
-        sieuAmDanHoiMoGanChieu: 0
+        sieuAmDanHoiMoGanChieu: 0,
+        sieuAmDauDoAmDaoChieu: 0,
+        doLoangXuongChieu: 0
       });
     }
     
@@ -450,8 +458,10 @@ function processScheduleData(rawData, targetMonth, targetYear, shiftFilter = 'to
     const clinicalFields = [
       'sieuAmBungSang', 'khamPhuKhoaSang', 'xQuangSang', 'dienTamDoSang',
       'sieuAmVuSang', 'sieuAmGiapSang', 'sieuAmTimSang', 'sieuAmDongMachCanhSang', 'sieuAmDanHoiMoGanSang',
+      'sieuAmDauDoAmDaoSang', 'doLoangXuongSang',
       'sieuAmBungChieu', 'khamPhuKhoaChieu', 'xQuangChieu', 'dienTamDoChieu',
-      'sieuAmVuChieu', 'sieuAmGiapChieu', 'sieuAmTimChieu', 'sieuAmDongMachCanhChieu', 'sieuAmDanHoiMoGanChieu'
+      'sieuAmVuChieu', 'sieuAmGiapChieu', 'sieuAmTimChieu', 'sieuAmDongMachCanhChieu', 'sieuAmDanHoiMoGanChieu',
+      'sieuAmDauDoAmDaoChieu', 'doLoangXuongChieu'
     ];
     
     // Tối ưu: Batch update clinical fields
@@ -1015,6 +1025,8 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
       { key: 'sieuAmTimSang', label: 'Siêu âm tim', shift: 'morning' },
       { key: 'sieuAmDongMachCanhSang', label: 'Siêu âm động mạch cảnh', shift: 'morning' },
       { key: 'sieuAmDanHoiMoGanSang', label: 'Siêu âm đàn hồi mô gan', shift: 'morning' },
+      { key: 'sieuAmDauDoAmDaoSang', label: 'Siêu âm đầu dò âm đạo', shift: 'morning' },
+      { key: 'doLoangXuongSang', label: 'Đo loãng xương', shift: 'morning' },
       { key: 'khamPhuKhoaChieu', label: 'Khám phụ khoa', shift: 'afternoon' },
       { key: 'xQuangChieu', label: 'X-quang', shift: 'afternoon' },
       { key: 'dienTamDoChieu', label: 'Điện tâm đồ', shift: 'afternoon' },
@@ -1023,7 +1035,9 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
       { key: 'sieuAmGiapChieu', label: 'Siêu âm giáp', shift: 'afternoon' },
       { key: 'sieuAmTimChieu', label: 'Siêu âm tim', shift: 'afternoon' },
       { key: 'sieuAmDongMachCanhChieu', label: 'Siêu âm động mạch cảnh', shift: 'afternoon' },
-      { key: 'sieuAmDanHoiMoGanChieu', label: 'Siêu âm đàn hồi mô gan', shift: 'afternoon' }
+      { key: 'sieuAmDanHoiMoGanChieu', label: 'Siêu âm đàn hồi mô gan', shift: 'afternoon' },
+      { key: 'sieuAmDauDoAmDaoChieu', label: 'Siêu âm đầu dò âm đạo', shift: 'afternoon' },
+      { key: 'doLoangXuongChieu', label: 'Đo loãng xương', shift: 'afternoon' }
     ];
     
     // Tạo dữ liệu theo ngày thay vì theo công ty
@@ -1049,6 +1063,8 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
       sieuAmTimSang: 0,
       sieuAmDongMachCanhSang: 0,
       sieuAmDanHoiMoGanSang: 0,
+      sieuAmDauDoAmDaoSang: 0,
+      doLoangXuongSang: 0,
       khamPhuKhoaChieu: 0,
       xQuangChieu: 0,
       dienTamDoChieu: 0,
@@ -1057,7 +1073,9 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
       sieuAmGiapChieu: 0,
       sieuAmTimChieu: 0,
       sieuAmDongMachCanhChieu: 0,
-      sieuAmDanHoiMoGanChieu: 0
+      sieuAmDanHoiMoGanChieu: 0,
+      sieuAmDauDoAmDaoChieu: 0,
+      doLoangXuongChieu: 0
     });
     
     // Khởi tạo dữ liệu cho tất cả các ngày trong tháng (trừ Chủ nhật)
@@ -1148,6 +1166,8 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
         sieuAmTimSang: dayData.sieuAmTimSang,
         sieuAmDongMachCanhSang: dayData.sieuAmDongMachCanhSang,
         sieuAmDanHoiMoGanSang: dayData.sieuAmDanHoiMoGanSang,
+        sieuAmDauDoAmDaoSang: dayData.sieuAmDauDoAmDaoSang,
+        doLoangXuongSang: dayData.doLoangXuongSang,
         khamPhuKhoaChieu: dayData.khamPhuKhoaChieu,
         xQuangChieu: dayData.xQuangChieu,
         dienTamDoChieu: dayData.dienTamDoChieu,
@@ -1156,7 +1176,9 @@ function getClinicalData(month = null, year = null, searchCompany = '', filterEm
         sieuAmGiapChieu: dayData.sieuAmGiapChieu,
         sieuAmTimChieu: dayData.sieuAmTimChieu,
         sieuAmDongMachCanhChieu: dayData.sieuAmDongMachCanhChieu,
-        sieuAmDanHoiMoGanChieu: dayData.sieuAmDanHoiMoGanChieu
+        sieuAmDanHoiMoGanChieu: dayData.sieuAmDanHoiMoGanChieu,
+        sieuAmDauDoAmDaoChieu: dayData.sieuAmDauDoAmDaoChieu,
+        doLoangXuongChieu: dayData.doLoangXuongChieu
       };
       
       // Hiển thị tất cả ngày trong tháng, không chỉ những ngày có dữ liệu
